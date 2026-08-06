@@ -227,7 +227,6 @@ export class SagnexStore {
   async updateTask(taskId: string, input: UpdateTaskInput): Promise<Task> {
     const task = await this.requireTask(taskId);
     await this.requireEditableEvent(task.eventId);
-    if (task.status === 'voided') throw new StoreError(409, '作废任务不能编辑');
     const timestamp = now();
     const values: Partial<typeof tasks.$inferInsert> = { updatedAt: timestamp };
     if (input.title !== undefined) values.title = input.title;
@@ -253,22 +252,14 @@ export class SagnexStore {
     });
   }
 
-  async deleteOrVoidTask(taskId: string): Promise<'deleted' | 'voided'> {
+  async deleteTask(taskId: string): Promise<void> {
     const task = await this.requireTask(taskId);
     await this.requireEditableEvent(task.eventId);
-    const countRows = await this.context.db.select({ value: count() }).from(stateChanges).where(eq(stateChanges.taskId, taskId));
-    const value = countRows[0]?.value ?? 0;
-    if (task.status === 'not_started' && value === 0) {
-      const timestamp = now();
-      this.context.db.transaction((tx) => {
-        tx.delete(tasks).where(eq(tasks.id, taskId)).run();
-        tx.update(events).set({ updatedAt: timestamp }).where(eq(events.id, task.eventId)).run();
-      });
-      return 'deleted';
-    }
-    if (task.status === 'voided') throw new StoreError(409, '任务已经作废');
-    await this.transitionTask(taskId, 'voided', true);
-    return 'voided';
+    const timestamp = now();
+    this.context.db.transaction((tx) => {
+      tx.delete(tasks).where(eq(tasks.id, taskId)).run();
+      tx.update(events).set({ updatedAt: timestamp }).where(eq(events.id, task.eventId)).run();
+    });
   }
 
   async transitionTask(taskId: string, toStatus: TaskStatus, confirmSoftDependencies: boolean): Promise<{ task: Task; unmetDependencies: Task[] }> {
@@ -288,31 +279,6 @@ export class SagnexStore {
     return { task: await this.requireTask(taskId), unmetDependencies };
   }
 
-  async restoreTask(taskId: string, confirmSoftDependencies: boolean): Promise<{ task: Task; restoredStatus: Exclude<TaskStatus, 'voided'>; unmetDependencies: Task[] }> {
-    const task = await this.requireTask(taskId);
-    await this.requireEditableEvent(task.eventId);
-    if (task.status !== 'voided') throw new StoreError(409, '只有作废任务可以恢复');
-    const [voidChange] = await this.context.db
-      .select()
-      .from(stateChanges)
-      .where(and(eq(stateChanges.taskId, taskId), eq(stateChanges.toStatus, 'voided')))
-      .orderBy(desc(stateChanges.changedAt))
-      .limit(1);
-    if (!voidChange || voidChange.fromStatus === 'voided') throw new StoreError(409, '找不到作废前的任务状态');
-    const restoredStatus = voidChange.fromStatus as Exclude<TaskStatus, 'voided'>;
-    const unmetDependencies = restoredStatus === 'in_progress' ? await this.getUnmetDependencies(task) : [];
-    if (unmetDependencies.length > 0 && !confirmSoftDependencies) {
-      throw new StoreError(409, '前置任务尚未完成', { code: 'SOFT_DEPENDENCY_CONFIRMATION', tasks: unmetDependencies });
-    }
-    const timestamp = now();
-    this.context.db.transaction((tx) => {
-      tx.update(tasks).set({ status: restoredStatus, updatedAt: timestamp, statusChangedAt: timestamp }).where(eq(tasks.id, taskId)).run();
-      tx.insert(stateChanges).values({ id: crypto.randomUUID(), taskId, fromStatus: 'voided', toStatus: restoredStatus, changedAt: timestamp }).run();
-      tx.update(events).set({ updatedAt: timestamp }).where(eq(events.id, task.eventId)).run();
-    });
-    return { task: await this.requireTask(taskId), restoredStatus, unmetDependencies };
-  }
-
   async getTaskHistory(taskId: string): Promise<StateChange[]> {
     await this.requireTask(taskId);
     return this.context.db.select().from(stateChanges).where(eq(stateChanges.taskId, taskId)).orderBy(desc(stateChanges.changedAt)) as Promise<StateChange[]>;
@@ -322,7 +288,6 @@ export class SagnexStore {
     await this.requireEditableEvent(eventId);
     const [source, target] = await Promise.all([this.requireTask(input.sourceTaskId), this.requireTask(input.targetTaskId)]);
     if (source.eventId !== eventId || target.eventId !== eventId) throw new StoreError(400, '依赖任务必须属于同一事件');
-    if (source.status === 'voided' || target.status === 'voided') throw new StoreError(409, '不能连接作废任务');
     const eventDependencies = await this.context.db.select().from(dependencies).where(eq(dependencies.eventId, eventId));
     if (eventDependencies.some((edge) => edge.sourceTaskId === input.sourceTaskId && edge.targetTaskId === input.targetTaskId)) throw new StoreError(409, '依赖关系已经存在');
     if (wouldCreateCycle(eventDependencies as Dependency[], input.sourceTaskId, input.targetTaskId)) throw new StoreError(409, '依赖关系不能形成环');
@@ -352,7 +317,7 @@ export class SagnexStore {
       this.context.db.select().from(tasks), this.context.db.select().from(dependencies), this.context.db.select().from(stateChanges)
     ]);
     return {
-      schemaVersion: 1,
+      schemaVersion: 2,
       exportedAt: now(),
       labels: labelRows.map((label) => ({ id: label.id, name: label.name, color: label.color, icon: label.icon, createdAt: label.createdAt })),
       events: eventRows,
@@ -421,7 +386,7 @@ export class SagnexStore {
     if (incoming.length === 0) return [];
     const sourceIds = incoming.map((edge) => edge.sourceTaskId);
     const sources = await this.context.db.select().from(tasks).where(inArray(tasks.id, sourceIds));
-    return sources.filter((source) => source.status !== 'completed' && source.status !== 'voided') as Task[];
+    return sources.filter((source) => source.status !== 'completed') as Task[];
   }
 
   private validateBackupReferences(backup: BackupEnvelope): void {

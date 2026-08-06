@@ -3,7 +3,6 @@ import {
   createEventInputSchema,
   createLabelInputSchema,
   createTaskInputSchema,
-  restoreTaskInputSchema,
   transitionInputSchema,
   updateEventInputSchema,
   updateLabelInputSchema,
@@ -95,16 +94,14 @@ export function createApp(context: DatabaseContext, options: { fetcher?: typeof 
     return reply.status(201).send(await store.createTask(eventId, createTaskInputSchema.parse(request.body)));
   });
   app.patch('/api/tasks/:taskId', async (request) => store.updateTask(taskIdParamsSchema.parse(request.params).taskId, updateTaskInputSchema.parse(request.body)));
-  app.delete('/api/tasks/:taskId', async (request) => ({ result: await store.deleteOrVoidTask(taskIdParamsSchema.parse(request.params).taskId) }));
+  app.delete('/api/tasks/:taskId', async (request, reply) => {
+    await store.deleteTask(taskIdParamsSchema.parse(request.params).taskId);
+    return reply.status(204).send();
+  });
   app.post('/api/tasks/:taskId/transition', async (request) => {
     const { taskId } = taskIdParamsSchema.parse(request.params);
     const input = transitionInputSchema.parse(request.body);
     return store.transitionTask(taskId, input.toStatus, input.confirmSoftDependencies);
-  });
-  app.post('/api/tasks/:taskId/restore', async (request) => {
-    const { taskId } = taskIdParamsSchema.parse(request.params);
-    const input = restoreTaskInputSchema.parse(request.body ?? {});
-    return store.restoreTask(taskId, input.confirmSoftDependencies);
   });
   app.get('/api/tasks/:taskId/history', async (request) => store.getTaskHistory(taskIdParamsSchema.parse(request.params).taskId));
   app.patch('/api/events/:eventId/layout', async (request, reply) => {

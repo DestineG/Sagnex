@@ -37,29 +37,17 @@ describe('SagnexStore', () => {
     await expect(store.transitionTask(second.id, 'in_progress', true)).resolves.toMatchObject({ task: { status: 'in_progress' } });
   });
 
-  it('hard deletes untouched tasks and voids progressed tasks', async () => {
+  it('permanently deletes progressed tasks, history, and dependencies', async () => {
     const event = await store.createEvent({ title: '事项', description: '', labelIds: [] });
-    const untouched = await store.createTask(event.id, { title: '未动', description: '', positionX: 0, positionY: 0 });
-    expect(await store.deleteOrVoidTask(untouched.id)).toBe('deleted');
     const progressed = await store.createTask(event.id, { title: '已动', description: '', positionX: 0, positionY: 0 });
+    const dependent = await store.createTask(event.id, { title: '后续', description: '', positionX: 200, positionY: 0 });
+    await store.createDependency(event.id, { sourceTaskId: progressed.id, targetTaskId: dependent.id });
     await store.transitionTask(progressed.id, 'in_progress', false);
-    expect(await store.deleteOrVoidTask(progressed.id)).toBe('voided');
-    expect((await store.getEvent(event.id)).tasks.find((task) => task.id === progressed.id)?.status).toBe('voided');
-  });
-
-  it('restores a voided task to its previous status and appends history', async () => {
-    const event = await store.createEvent({ title: '事项', description: '', labelIds: [] });
-    const task = await store.createTask(event.id, { title: '任务', description: '', positionX: 0, positionY: 0 });
-    await store.transitionTask(task.id, 'in_progress', false);
-    await store.transitionTask(task.id, 'paused', false);
-    await store.deleteOrVoidTask(task.id);
-    const result = await store.restoreTask(task.id, false);
-    expect(result.restoredStatus).toBe('paused');
-    expect(result.task.status).toBe('paused');
-    expect(await store.getTaskHistory(task.id)).toEqual(expect.arrayContaining([
-      expect.objectContaining({ fromStatus: 'paused', toStatus: 'voided' }),
-      expect.objectContaining({ fromStatus: 'voided', toStatus: 'paused' })
-    ]));
+    await store.deleteTask(progressed.id);
+    const graph = await store.getEvent(event.id);
+    expect(graph.tasks.map((task) => task.id)).toEqual([dependent.id]);
+    expect(graph.dependencies).toHaveLength(0);
+    await expect(store.getTaskHistory(progressed.id)).rejects.toMatchObject({ statusCode: 404 });
   });
 
   it('only permanently deletes archived events', async () => {

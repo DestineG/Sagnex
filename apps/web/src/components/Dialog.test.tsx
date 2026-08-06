@@ -26,4 +26,9 @@ describe('Dialog', () => {
     await userEvent.keyboard('{Escape}');
     expect(trigger).toHaveFocus();
   });
+
+  it('keeps focus on an autofocus field', () => {
+    render(<Dialog title="新建任务" onClose={() => undefined}><input aria-label="标题" autoFocus /></Dialog>);
+    expect(screen.getByRole('textbox', { name: '标题' })).toHaveFocus();
+  });
 });

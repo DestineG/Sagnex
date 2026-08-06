@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
   description TEXT NOT NULL DEFAULT '',
-  status TEXT NOT NULL CHECK(status IN ('not_started','in_progress','paused','completed','voided')),
+  status TEXT NOT NULL CHECK(status IN ('not_started','in_progress','paused','completed')),
   position_x REAL NOT NULL,
   position_y REAL NOT NULL,
   created_at TEXT NOT NULL,
@@ -81,15 +81,7 @@ export function createDatabase(path: string): DatabaseContext {
   raw.pragma('foreign_keys = ON');
   if (path !== ':memory:') raw.pragma('journal_mode = WAL');
   raw.exec(migrationSql);
-  const labelColumns = raw.prepare('PRAGMA table_info(labels)').all() as Array<{ name: string }>;
-  if (!labelColumns.some((column) => column.name === 'icon')) {
-    raw.exec("ALTER TABLE labels ADD COLUMN icon TEXT NOT NULL DEFAULT 'tag'");
-  }
-  const taskColumns = raw.prepare('PRAGMA table_info(tasks)').all() as Array<{ name: string }>;
-  if (!taskColumns.some((column) => column.name === 'status_changed_at')) {
-    raw.exec('ALTER TABLE tasks ADD COLUMN status_changed_at TEXT; UPDATE tasks SET status_changed_at = created_at WHERE status_changed_at IS NULL;');
-  }
-  raw.pragma('user_version = 4');
+  raw.pragma('user_version = 5');
   return {
     raw,
     db: drizzle(raw, { schema }),

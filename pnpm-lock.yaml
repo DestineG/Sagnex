@@ -53,9 +53,6 @@ importers:
       drizzle-orm:
         specifier: ^0.44.7
         version: 0.44.7(@types/better-sqlite3@7.6.13)(better-sqlite3@11.10.0)
-      env-paths:
-        specifier: ^3.0.0
-        version: 3.0.0
       fast-xml-parser:
         specifier: ^5.10.1
         version: 5.10.1
@@ -1359,10 +1356,6 @@ packages:
   entities@8.0.0:
     resolution: {integrity: sha512-zwfzJecQ/Uej6tusMqwAqU/6KL2XaB2VZ2Jg54Je6ahNBGNH6Ek6g3jjNCF0fG9EWQKGZNddNjU5F1ZQn/sBnA==}
     engines: {node: '>=20.19.0'}
-
-  env-paths@3.0.0:
-    resolution: {integrity: sha512-dtJUTepzMW3Lm/NPxRf3wP4642UWhjL2sQxc+ym2YMj1m/H2zDNQOlezafzkHwn6sMstjHTwG6iQQsctDW/b1A==}
-    engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
 
   es-module-lexer@2.3.1:
     resolution: {integrity: sha512-shc1dbU90Yl/xq1QrC7QRtfcwURZuVRfPhZbDoldJ1cn1gzDvBaBWlv0eFolj5+0znnPJz5TXLxsN77X/12KTA==}
@@ -3435,8 +3428,6 @@ snapshots:
   entities@7.0.1: {}
 
   entities@8.0.0: {}
-
-  env-paths@3.0.0: {}
 
   es-module-lexer@2.3.1: {}
 

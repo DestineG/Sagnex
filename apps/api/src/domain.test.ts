@@ -11,19 +11,17 @@ const dependency = (sourceTaskId: string, targetTaskId: string): Dependency => (
 });
 
 describe('domain rules', () => {
-  it('derives event status from effective tasks', () => {
+  it('derives event status from tasks', () => {
     expect(calculateEventStatus([])).toBe('creating');
     expect(calculateEventStatus([task('a', 'not_started')])).toBe('creating');
     expect(calculateEventStatus([task('a', 'completed'), task('b', 'completed')])).toBe('completed');
     expect(calculateEventStatus([task('a', 'completed'), task('b', 'paused')])).toBe('in_progress');
-    expect(calculateEventStatus([task('a', 'voided')])).toBe('creating');
   });
 
   it('allows only explicit task transitions', () => {
     expect(canTransition('not_started', 'in_progress')).toBe(true);
     expect(canTransition('not_started', 'completed')).toBe(false);
     expect(canTransition('completed', 'in_progress')).toBe(true);
-    expect(canTransition('voided', 'in_progress')).toBe(false);
   });
 
   it('rejects self links and cycles', () => {

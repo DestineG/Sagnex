@@ -345,6 +345,10 @@ fieldset.field { padding: 0; border: 0; }
 .selected-labels { display: flex; align-items: center; flex: 1; gap: 6px; min-width: 0; padding: 6px 4px 6px 8px; overflow: hidden; flex-wrap: wrap; }
 .label-placeholder { color: #8a958e; }
 .label-chip { min-height: 27px; padding-right: 4px; background: var(--subtle); }
+.label-chip-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.label-icon-mark { display: grid; place-items: center; flex: 0 0 20px; width: 20px; height: 20px; border: 1px solid color-mix(in srgb, currentColor 32%, transparent); border-radius: 4px; background: color-mix(in srgb, currentColor 9%, white); }
+.label-icon-mark > svg, .label-icon-mark .label-custom-svg { width: 14px; height: 14px; }
+.label-icon-mark .label-emoji { width: auto; height: auto; font-size: 14px; }
 .label-chip button { display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 4px; color: var(--muted); background: transparent; cursor: pointer; }
 .label-chip button:hover { color: var(--text); background: var(--subtle-strong); }
 .label-chip button svg { width: 13px; height: 13px; }
@@ -358,10 +362,9 @@ fieldset.field { padding: 0; border: 0; }
 .label-options { max-height: 220px; overflow: auto; padding: 5px; }
 .label-option, .label-create { display: flex; align-items: center; gap: 9px; width: 100%; min-height: 38px; padding: 7px 9px; border: 0; border-radius: 5px; background: transparent; text-align: left; cursor: pointer; }
 .label-option:hover, .label-option.selected { background: var(--subtle); }
-.label-option span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.label-option-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .label-option > svg:first-child { width: 16px; height: 16px; color: var(--muted-strong); }
 .label-option > svg:last-child { color: var(--green); }
-.label-color { width: 12px; height: 12px; border-radius: 3px; }
 .label-empty { padding: 14px 10px; color: var(--muted); text-align: center; }
 .label-create { border-top: 1px solid var(--line); border-radius: 0; color: var(--green-strong); }
 
@@ -416,8 +419,6 @@ fieldset.field { padding: 0; border: 0; }
 .editor-body { display: grid; grid-template-columns: minmax(0, 1fr) 320px; min-height: 0; height: 100%; overflow: hidden; }
 .flow-column { position: relative; min-width: 0; min-height: 0; overflow: hidden; }
 .flow-canvas { position: absolute; inset: 0; width: 100%; height: 100%; background: var(--canvas); }
-.menu-check { display: grid; place-items: center; width: 17px; height: 17px; border: 1px solid var(--line-strong); border-radius: 4px; }
-.menu-check svg { width: 13px; height: 13px; color: var(--green); }
 .canvas-error { position: absolute; z-index: 6; top: 14px; left: 14px; display: flex; align-items: center; gap: 10px; max-width: min(440px, calc(100% - 28px)); padding: 10px 12px; border: 1px solid #f1cdd0; border-radius: 6px; color: var(--red); background: var(--red-soft); box-shadow: 0 5px 16px rgb(80 20 25 / 8%); }
 .canvas-error button { border: 0; background: transparent; color: inherit; cursor: pointer; }
 .inspector { min-width: 0; overflow: auto; border-left: 1px solid var(--line); background: var(--surface); }
@@ -435,11 +436,11 @@ fieldset.field { padding: 0; border: 0; }
 .history-list > div > i { width: 8px; height: 8px; margin-top: 6px; border: 2px solid var(--surface); border-radius: 50%; background: var(--green); box-shadow: 0 0 0 1px var(--line-strong); }
 .history-list time { display: block; margin-top: 3px; color: var(--muted); }
 
-.task-node { position: relative; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; width: 220px; min-height: 124px; padding: 13px 15px 12px 17px; border: 1px solid var(--line-strong); border-left: 4px solid #758079; border-radius: 7px; background: var(--surface); box-shadow: 0 5px 14px rgb(26 43 33 / 7%); }
+.task-node { position: relative; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; width: 208px; height: 108px; padding: 10px 12px 10px 14px; border: 1px solid var(--line-strong); border-left: 4px solid #758079; border-radius: 7px; background: var(--surface); box-shadow: 0 4px 12px rgb(26 43 33 / 7%); }
 .task-node.selected { outline: 2px solid var(--green); outline-offset: 3px; }
 .task-node strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.task-node > p { display: -webkit-box; margin-top: 5px; overflow: hidden; color: var(--muted); font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
-.task-node-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; align-self: end; margin-top: 9px; color: var(--muted-strong); font-size: 13px; }
+.task-node > p { display: -webkit-box; margin-top: 3px; overflow: hidden; color: var(--muted); font-size: 12px; line-height: 1.35; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.task-node-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; align-self: end; margin-top: 6px; color: var(--muted-strong); font-size: 12px; }
 .task-node-foot > span { display: flex; align-items: center; gap: 7px; }
 .task-node-foot svg { width: 16px; height: 16px; }
 .task-node-foot time { color: var(--muted); font-size: 11px; white-space: nowrap; }
@@ -449,23 +450,14 @@ fieldset.field { padding: 0; border: 0; }
 .task-node.status-paused .task-node-foot > span { color: var(--orange); }
 .task-node.status-completed { border-color: #89bdca; border-left-color: var(--blue); background: #f0f8fa; }
 .task-node.status-completed .task-node-foot > span { color: var(--blue); }
-.task-node.status-voided { border-style: dashed; border-left-color: #929a95; opacity: .62; box-shadow: none; }
 .react-flow__handle { width: 10px; height: 10px; border: 2px solid var(--surface); background: #69756e; }
 .react-flow__edge-path { stroke: #829087; stroke-width: 1.8; }
 .react-flow__edge.selected .react-flow__edge-path { stroke: var(--green); stroke-width: 2.4; }
 .react-flow__background { color: #d4ddd7; }
 .react-flow__controls { overflow: hidden; border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 4px 15px rgb(30 50 38 / 8%); }
 .react-flow__controls button { border-color: var(--line); background: var(--surface); fill: var(--text); }
-.canvas-minimap { position: absolute; z-index: 5; right: 14px; bottom: 14px; width: 220px; height: 140px; overflow: hidden; border: 1px solid #bdc9c1; border-radius: 7px; background: #f7faf8; box-shadow: 0 6px 20px rgb(26 43 33 / 13%); }
-.canvas-minimap svg { display: block; width: 100%; height: 100%; cursor: crosshair; touch-action: none; }
-.canvas-minimap-bg { fill: #f1f5f2; }
-.canvas-minimap-edge { fill: none; stroke: #7f8e85; stroke-width: 5; }
-.canvas-minimap-node { fill: #ffffff; stroke: #68766e; stroke-width: 5; }
-.canvas-minimap-node.status-in_progress { fill: #dff3e8; stroke: var(--green); }
-.canvas-minimap-node.status-paused { fill: #fff0d9; stroke: var(--orange); }
-.canvas-minimap-node.status-completed { fill: #dff0f4; stroke: var(--blue); }
-.canvas-minimap-node.status-voided { fill: #e8ebe9; stroke: #8c9690; stroke-dasharray: 10 7; }
-.canvas-minimap-viewport { fill: rgb(19 122 85 / 10%); stroke: #0b6948; }
+.canvas-minimap.react-flow__minimap { right: 14px; bottom: 14px; width: 220px; height: 140px; overflow: hidden; border: 1px solid #aebdb4; border-radius: 7px; background: #f5f8f6; box-shadow: 0 6px 20px rgb(26 43 33 / 13%); }
+.canvas-minimap .react-flow__minimap-svg { width: 100%; height: 100%; }
 
 .sr-only { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0,0,0,0) !important; white-space: nowrap !important; border: 0 !important; }
 
@@ -505,6 +497,7 @@ fieldset.field { padding: 0; border: 0; }
   .commandbar-divider { display: none; }
   .editor-body { display: grid; grid-template-columns: 1fr; height: auto; overflow: visible; }
   .flow-column { height: 58dvh; min-height: 440px; }
+  .canvas-minimap.react-flow__minimap { display: none; }
   .inspector { max-height: none; border-top: 1px solid var(--line); border-left: 0; }
   .save-state { display: none; }
 }

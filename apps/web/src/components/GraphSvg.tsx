@@ -2,7 +2,7 @@ import type { Dependency, Task, TaskStatus } from '@sagnex/contracts';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { formatStatusDate, taskStatusText } from '../api';
 
-const NODE_WIDTH = 220;
+const NODE_WIDTH = 208;
 const NODE_HEIGHT = 108;
 const PADDING = 44;
 
@@ -10,8 +10,7 @@ const statusColors: Record<TaskStatus, { accent: string; border: string; fill: s
   not_started: { accent: '#6f7973', border: '#cbd3ce', fill: '#ffffff', text: '#4f5953' },
   in_progress: { accent: '#16805b', border: '#52a987', fill: '#eff9f4', text: '#126446' },
   paused: { accent: '#b56714', border: '#d9a35d', fill: '#fff8ec', text: '#92500d' },
-  completed: { accent: '#28748f', border: '#71aebe', fill: '#eef8fa', text: '#1f657b' },
-  voided: { accent: '#929a95', border: '#b8bfba', fill: '#f4f5f4', text: '#747c77' }
+  completed: { accent: '#28748f', border: '#71aebe', fill: '#eef8fa', text: '#1f657b' }
 };
 
 interface Point { x: number; y: number }
@@ -67,7 +66,6 @@ function StatusGlyph({ status, x, y }: { status: TaskStatus; x: number; y: numbe
   if (status === 'in_progress') return <path d={`M ${x} ${y - 5} L ${x + 9} ${y} L ${x} ${y + 5} Z`} fill={color} />;
   if (status === 'paused') return <><rect x={x} y={y - 5} width="3" height="10" rx="1" fill={color} /><rect x={x + 6} y={y - 5} width="3" height="10" rx="1" fill={color} /></>;
   if (status === 'completed') return <path d={`M ${x} ${y} l 4 4 l 8 -9`} fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />;
-  if (status === 'voided') return <><circle cx={x + 5} cy={y} r="6" fill="none" stroke={color} strokeWidth="1.8" /><path d={`M ${x + 1} ${y - 4} l 8 8`} stroke={color} strokeWidth="1.8" /></>;
   return <circle cx={x + 5} cy={y} r="5" fill="none" stroke={color} strokeWidth="1.8" />;
 }
 
@@ -106,7 +104,7 @@ export function GraphSvg({ tasks, dependencies, className, width, height, intera
       {tasks.map((task) => {
         const palette = statusColors[task.status];
         const node = <g>
-          <rect x={task.positionX} y={task.positionY} width={NODE_WIDTH} height={NODE_HEIGHT} rx="7" fill={palette.fill} stroke={palette.border} strokeWidth="2" strokeDasharray={task.status === 'voided' ? '6 5' : undefined} />
+          <rect x={task.positionX} y={task.positionY} width={NODE_WIDTH} height={NODE_HEIGHT} rx="7" fill={palette.fill} stroke={palette.border} strokeWidth="2" />
           <rect x={task.positionX} y={task.positionY} width="5" height={NODE_HEIGHT} rx="2.5" fill={palette.accent} />
           <text x={task.positionX + 18} y={task.positionY + 27} fill="#1f2923" fontFamily="Segoe UI, Microsoft YaHei, sans-serif" fontSize="15" fontWeight="600">{task.title.length > 20 ? `${task.title.slice(0, 19)}…` : task.title}</text>
           {task.description && <text x={task.positionX + 18} y={task.positionY + 51} fill="#69756e" fontFamily="Segoe UI, Microsoft YaHei, sans-serif" fontSize="11">{task.description.length > 25 ? `${task.description.slice(0, 24)}…` : task.description}</text>}

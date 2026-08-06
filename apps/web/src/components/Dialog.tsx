@@ -24,7 +24,7 @@ export function Dialog({ title, children, onClose, onSubmit, submitLabel = 'ä¿å
   useEffect(() => {
     const dialog = formRef.current ?? sectionRef.current;
     const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    dialog?.focus();
+    if (dialog && !dialog.contains(document.activeElement)) dialog.focus();
 
     function handleKeyboard(event: KeyboardEvent) {
       if (event.key === 'Escape' && !busyRef.current) {

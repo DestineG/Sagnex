@@ -4,8 +4,7 @@ export const taskStatusSchema = z.enum([
   'not_started',
   'in_progress',
   'paused',
-  'completed',
-  'voided'
+  'completed'
 ]);
 
 export const eventStatusSchema = z.enum(['creating', 'in_progress', 'completed']);
@@ -140,10 +139,6 @@ export const transitionInputSchema = z.object({
   confirmSoftDependencies: z.boolean().default(false)
 });
 
-export const restoreTaskInputSchema = z.object({
-  confirmSoftDependencies: z.boolean().default(false)
-});
-
 export const createLabelInputSchema = z.object({
   name: z.string().trim().min(1).max(48),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
@@ -160,7 +155,7 @@ export const updateLabelInputSchema = z.object({
 );
 
 export const backupEnvelopeSchema = z.object({
-  schemaVersion: z.literal(1),
+  schemaVersion: z.literal(2),
   exportedAt: z.string(),
   labels: z.array(z.object({
     id: z.string().uuid(), name: z.string(), color: z.string(), icon: labelIconSchema.default('tag'), createdAt: z.string()

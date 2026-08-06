@@ -46,15 +46,17 @@ test('completes the local event workflow', async ({ page, request }) => {
   await expect(page.getByText('未开始 → 进行中')).toBeVisible();
   await expect(page.locator('.canvas-minimap')).toBeVisible();
 
+  await page.getByRole('button', { name: '任务', exact: true }).click();
+  await page.getByPlaceholder('任务名称').fill('待删除任务');
+  await page.getByRole('button', { name: '添加到画布' }).click();
+  const disposableGraph = await (await request.get(`/api/events/${eventId}`)).json();
+  const disposable = disposableGraph.tasks.find((task: { title: string }) => task.title === '待删除任务');
+  await page.getByRole('button', { name: '开始' }).click();
+  await expect(page.getByText('未开始 → 进行中')).toBeVisible();
   page.once('dialog', (dialog) => dialog.accept());
-  await page.getByRole('button', { name: '作废任务' }).click();
-  await expect(page.locator('.canvas-error')).toHaveCount(0);
-  await page.getByRole('button', { name: '视图', exact: true }).click();
-  await page.getByRole('button', { name: '显示作废任务' }).click();
-  await page.locator('.task-node').filter({ hasText: '后续任务' }).click();
-  page.once('dialog', (dialog) => dialog.accept());
-  await page.getByRole('button', { name: '恢复到进行中' }).click();
-  await expect(page.getByText('已作废 → 进行中')).toBeVisible();
+  await page.getByRole('button', { name: '删除任务' }).click();
+  await expect(page.locator('.task-node').filter({ hasText: '待删除任务' })).toHaveCount(0);
+  expect((await request.get(`/api/tasks/${disposable.id}/history`)).status()).toBe(404);
 
   const canvasDownloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: '导出' }).click();

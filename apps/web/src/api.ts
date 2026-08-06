@@ -63,9 +63,8 @@ export const api = {
   deleteEvent: (id: string) => request<void>(`/api/events/${id}`, { method: 'DELETE' }),
   createTask: (eventId: string, input: CreateTaskInput) => request<Task>(`/api/events/${eventId}/tasks`, { method: 'POST', ...json(input) }),
   updateTask: (taskId: string, input: UpdateTaskInput) => request<Task>(`/api/tasks/${taskId}`, { method: 'PATCH', ...json(input) }),
-  deleteTask: (taskId: string) => request<{ result: 'deleted' | 'voided' }>(`/api/tasks/${taskId}`, { method: 'DELETE' }),
+  deleteTask: (taskId: string) => request<void>(`/api/tasks/${taskId}`, { method: 'DELETE' }),
   transitionTask: (taskId: string, toStatus: TaskStatus, confirmSoftDependencies = false) => request<{ task: Task }>(`/api/tasks/${taskId}/transition`, { method: 'POST', ...json({ toStatus, confirmSoftDependencies }) }),
-  restoreTask: (taskId: string, confirmSoftDependencies = false) => request<{ task: Task; restoredStatus: Exclude<TaskStatus, 'voided'> }>(`/api/tasks/${taskId}/restore`, { method: 'POST', ...json({ confirmSoftDependencies }) }),
   getTaskHistory: (taskId: string) => request<StateChange[]>(`/api/tasks/${taskId}/history`),
   updateLayout: (eventId: string, input: UpdateLayoutInput) => request<void>(`/api/events/${eventId}/layout`, { method: 'PATCH', ...json(input) }),
   createDependency: (eventId: string, input: CreateDependencyInput) => request(`/api/events/${eventId}/dependencies`, { method: 'POST', ...json(input) }),
@@ -105,7 +104,7 @@ export function downloadBlob(filename: string, blob: Blob) {
 
 export const eventStatusText = { creating: '创建中', in_progress: '进行中', completed: '已完成' } as const;
 export const taskStatusText: Record<TaskStatus, string> = {
-  not_started: '未开始', in_progress: '进行中', paused: '已暂停', completed: '已完成', voided: '已作废'
+  not_started: '未开始', in_progress: '进行中', paused: '已暂停', completed: '已完成'
 };
 
 export function formatDate(value: string) {

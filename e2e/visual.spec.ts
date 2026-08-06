@@ -42,21 +42,27 @@ test('renders active cards and editor across desktop and mobile', async ({ page,
   await expect(page.locator('.inspector input').first()).toHaveValue('封面确认');
   await expect(page.locator('.canvas-minimap')).toBeVisible();
   await page.waitForTimeout(400);
-  const minimapViewport = page.getByTestId('minimap-viewport');
-  const viewportBeforePan = {
-    x: await minimapViewport.getAttribute('x'),
-    width: await minimapViewport.getAttribute('width'),
-    height: await minimapViewport.getAttribute('height')
+  const minimapSvg = page.locator('.react-flow__minimap-svg');
+  const minimapNode = page.locator('.react-flow__minimap-node').first();
+  expect((await minimapSvg.boundingBox())!.width).toBeGreaterThan(180);
+  expect((await minimapNode.boundingBox())!.width).toBeGreaterThan(10);
+  const readMinimapViewport = async () => {
+    const path = await page.locator('.react-flow__minimap-mask').getAttribute('d');
+    const matches = [...path!.matchAll(/M([\d.eE+-]+),([\d.eE+-]+)h([\d.eE+-]+)v([\d.eE+-]+)/g)];
+    const viewport = matches.at(-1)!;
+    return { x: Number(viewport[1]), y: Number(viewport[2]), width: Number(viewport[3]), height: Number(viewport[4]) };
   };
+  const viewportBeforePan = await readMinimapViewport();
   const paneBox = await page.locator('.react-flow__pane').boundingBox();
   expect(paneBox).not.toBeNull();
   await page.mouse.move(paneBox!.x + 70, paneBox!.y + paneBox!.height - 100);
   await page.mouse.down();
   await page.mouse.move(paneBox!.x + 180, paneBox!.y + paneBox!.height - 100, { steps: 5 });
   await page.mouse.up();
-  await expect.poll(() => minimapViewport.getAttribute('x')).not.toBe(viewportBeforePan.x);
-  expect(await minimapViewport.getAttribute('width')).toBe(viewportBeforePan.width);
-  expect(await minimapViewport.getAttribute('height')).toBe(viewportBeforePan.height);
+  await expect.poll(async () => (await readMinimapViewport()).x).not.toBe(viewportBeforePan.x);
+  const viewportAfterPan = await readMinimapViewport();
+  expect(viewportAfterPan.width).toBeCloseTo(viewportBeforePan.width, 5);
+  expect(viewportAfterPan.height).toBeCloseTo(viewportBeforePan.height, 5);
   await page.screenshot({ path: 'test-results/editor-desktop.png', fullPage: true });
   const canvasDownloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: '导出', exact: true }).click();
@@ -69,7 +75,7 @@ test('renders active cards and editor across desktop and mobile', async ({ page,
   await page.goto('/');
   await page.screenshot({ path: 'test-results/active-mobile.png', fullPage: true });
   await page.goto(`/events/${event.id}?task=${third.id}`);
-  await expect(page.locator('.canvas-minimap')).toHaveCount(0);
+  await expect(page.locator('.canvas-minimap')).not.toBeVisible();
   await page.screenshot({ path: 'test-results/editor-mobile.png', fullPage: true });
 
   await request.post(`/api/events/${event.id}/archive`);

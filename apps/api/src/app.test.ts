@@ -17,18 +17,15 @@ describe('API', () => {
     expect(archived.json().archivedAt).toBeTruthy();
   });
 
-  it('returns JSON when deleting or voiding tasks and supports restore', async () => {
+  it('permanently deletes progressed tasks', async () => {
     const created = await app.inject({ method: 'POST', url: '/api/events', payload: { title: '事件', description: '', labelIds: [] } });
     const event = created.json();
     const taskResponse = await app.inject({ method: 'POST', url: `/api/events/${event.id}/tasks`, payload: { title: '任务', description: '', positionX: 0, positionY: 0 } });
     const task = taskResponse.json();
     await app.inject({ method: 'POST', url: `/api/tasks/${task.id}/transition`, payload: { toStatus: 'in_progress', confirmSoftDependencies: false } });
-    const voided = await app.inject({ method: 'DELETE', url: `/api/tasks/${task.id}` });
-    expect(voided.statusCode, voided.body).toBe(200);
-    expect(voided.json()).toEqual({ result: 'voided' });
-    const restored = await app.inject({ method: 'POST', url: `/api/tasks/${task.id}/restore`, payload: { confirmSoftDependencies: false } });
-    expect(restored.statusCode, restored.body).toBe(200);
-    expect(restored.json()).toMatchObject({ restoredStatus: 'in_progress', task: { status: 'in_progress' } });
+    const deleted = await app.inject({ method: 'DELETE', url: `/api/tasks/${task.id}` });
+    expect(deleted.statusCode, deleted.body).toBe(204);
+    expect((await app.inject({ method: 'GET', url: `/api/tasks/${task.id}/history` })).statusCode).toBe(404);
   });
 
   it('reports the effective pre-restore backup directory', async () => {

@@ -28,7 +28,7 @@ export const tasks = sqliteTable('tasks', {
   eventId: text('event_id').notNull().references(() => events.id, { onDelete: 'cascade' }),
   title: text('title').notNull(),
   description: text('description').notNull().default(''),
-  status: text('status', { enum: ['not_started', 'in_progress', 'paused', 'completed', 'voided'] }).notNull(),
+  status: text('status', { enum: ['not_started', 'in_progress', 'paused', 'completed'] }).notNull(),
   positionX: real('position_x').notNull(),
   positionY: real('position_y').notNull(),
   createdAt: text('created_at').notNull(),
@@ -47,8 +47,8 @@ export const dependencies = sqliteTable('dependencies', {
 export const stateChanges = sqliteTable('task_state_changes', {
   id: text('id').primaryKey(),
   taskId: text('task_id').notNull().references(() => tasks.id, { onDelete: 'cascade' }),
-  fromStatus: text('from_status', { enum: ['not_started', 'in_progress', 'paused', 'completed', 'voided'] }).notNull(),
-  toStatus: text('to_status', { enum: ['not_started', 'in_progress', 'paused', 'completed', 'voided'] }).notNull(),
+  fromStatus: text('from_status', { enum: ['not_started', 'in_progress', 'paused', 'completed'] }).notNull(),
+  toStatus: text('to_status', { enum: ['not_started', 'in_progress', 'paused', 'completed'] }).notNull(),
   changedAt: text('changed_at').notNull()
 });
 

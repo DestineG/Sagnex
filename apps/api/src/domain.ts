@@ -2,10 +2,9 @@ import type { Dependency, EventStatus, Task, TaskStatus } from '@sagnex/contract
 
 const transitions: Record<TaskStatus, readonly TaskStatus[]> = {
   not_started: ['in_progress'],
-  in_progress: ['paused', 'completed', 'voided'],
-  paused: ['in_progress', 'completed', 'voided'],
-  completed: ['in_progress', 'voided'],
-  voided: []
+  in_progress: ['paused', 'completed'],
+  paused: ['in_progress', 'completed'],
+  completed: ['in_progress']
 };
 
 export function canTransition(from: TaskStatus, to: TaskStatus): boolean {
@@ -13,17 +12,15 @@ export function canTransition(from: TaskStatus, to: TaskStatus): boolean {
 }
 
 export function calculateEventStatus(tasks: Pick<Task, 'status'>[]): EventStatus {
-  const effective = tasks.filter((task) => task.status !== 'voided');
-  if (effective.length === 0 || effective.every((task) => task.status === 'not_started')) return 'creating';
-  if (effective.every((task) => task.status === 'completed')) return 'completed';
+  if (tasks.length === 0 || tasks.every((task) => task.status === 'not_started')) return 'creating';
+  if (tasks.every((task) => task.status === 'completed')) return 'completed';
   return 'in_progress';
 }
 
 export function getProgress(tasks: Pick<Task, 'status'>[]): { completedTasks: number; totalTasks: number } {
-  const effective = tasks.filter((task) => task.status !== 'voided');
   return {
-    completedTasks: effective.filter((task) => task.status === 'completed').length,
-    totalTasks: effective.length
+    completedTasks: tasks.filter((task) => task.status === 'completed').length,
+    totalTasks: tasks.length
   };
 }
 
@@ -52,19 +49,18 @@ export function wouldCreateCycle(
 }
 
 export function selectPreviewTaskIds(tasks: Task[], dependencies: Dependency[], limit = 8): Set<string> {
-  const visible = tasks.filter((task) => task.status !== 'voided');
-  if (visible.length === 0) return new Set();
-  const visibleIds = new Set(visible.map((task) => task.id));
-  const running = visible.filter((task) => task.status === 'in_progress');
+  if (tasks.length === 0) return new Set();
+  const visibleIds = new Set(tasks.map((task) => task.id));
+  const running = tasks.filter((task) => task.status === 'in_progress');
   const targets = new Set(dependencies.filter((edge) => visibleIds.has(edge.sourceTaskId) && visibleIds.has(edge.targetTaskId)).map((edge) => edge.sourceTaskId));
-  const focus = running.length > 0 ? running : visible.filter((task) => !targets.has(task.id));
+  const focus = running.length > 0 ? running : tasks.filter((task) => !targets.has(task.id));
   const focusIds = new Set(focus.map((task) => task.id));
   const neighbors = new Set<string>();
   for (const edge of dependencies) {
     if (focusIds.has(edge.targetTaskId)) neighbors.add(edge.sourceTaskId);
     if (running.length > 0 && focusIds.has(edge.sourceTaskId)) neighbors.add(edge.targetTaskId);
   }
-  const ordered = [...visible].sort((a, b) => {
+  const ordered = [...tasks].sort((a, b) => {
     const aRank = focusIds.has(a.id) ? 0 : neighbors.has(a.id) ? 1 : 2;
     const bRank = focusIds.has(b.id) ? 0 : neighbors.has(b.id) ? 1 : 2;
     if (aRank !== bRank) return aRank - bRank;

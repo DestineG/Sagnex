@@ -361,6 +361,7 @@ fieldset.field { padding: 0; border: 0; }
 .svg-source-switch button.selected { color: var(--green-strong); background: var(--surface); box-shadow: 0 1px 2px rgb(24 42 32 / 10%); }
 .svg-custom-fields { display: grid; gap: 10px; }
 .color-field { padding-top: 13px; border-top: 1px solid var(--line); }
+.color-field legend { margin-bottom: 12px; }
 .emoji-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
 .emoji-grid button { display: grid; place-items: center; min-width: 0; aspect-ratio: 1; border: 1px solid transparent; border-radius: 6px; font-size: 22px; background: transparent; cursor: pointer; }
 .emoji-grid button:hover { border-color: var(--line); background: var(--subtle); }

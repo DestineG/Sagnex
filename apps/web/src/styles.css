@@ -99,7 +99,8 @@ svg { width: 17px; height: 17px; flex: 0 0 auto; }
 .icon-button[data-tooltip][aria-expanded="true"]::after { display: none; }
 
 .active-export { background: var(--bg); }
-.active-page-head, .active-grid, .snapshot-heading { width: min(100%, 1720px); }
+.active-page-head { width: 100%; }
+.active-grid, .snapshot-heading { width: min(100%, 1720px); }
 .snapshot-heading { display: none; align-items: center; justify-content: space-between; padding: 0 36px 22px; color: var(--muted); }
 .active-export.exporting { padding-top: 28px; }
 .active-export.exporting .snapshot-heading { display: flex; }

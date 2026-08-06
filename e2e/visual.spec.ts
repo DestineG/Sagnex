@@ -21,17 +21,23 @@ test('renders active cards and editor across desktop and mobile', async ({ page,
   await request.post(`/api/tasks/${first.id}/transition`, { data: { toStatus: 'completed', confirmSoftDependencies: false } });
   await request.post(`/api/tasks/${third.id}/transition`, { data: { toStatus: 'in_progress', confirmSoftDependencies: false } });
 
-  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.setViewportSize({ width: 2560, height: 1080 });
   await page.goto('/');
   await expect(page.getByText(eventTitle)).toBeVisible();
   await expect(page.getByText(/尚未完成的事件/)).toHaveCount(0);
   await expect(page.locator('.event-card').filter({ hasText: eventTitle }).locator('.graph-edges path')).toHaveCount(4);
+  const mainBox = await page.locator('.main-content').boundingBox();
+  const actionsBox = await page.locator('.active-page-head .head-actions').boundingBox();
+  expect(mainBox).not.toBeNull();
+  expect(actionsBox).not.toBeNull();
+  expect(Math.abs(mainBox!.x + mainBox!.width - actionsBox!.x - actionsBox!.width - 36)).toBeLessThan(2);
   await page.screenshot({ path: 'test-results/active-desktop.png', fullPage: true });
   const activeDownloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: '导出快照' }).click();
   const activeDownload = await activeDownloadPromise;
   await activeDownload.saveAs('test-results/active-export.png');
   expect((await stat('test-results/active-export.png')).size).toBeGreaterThan(5_000);
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(`/events/${event.id}?task=${third.id}`);
   await expect(page.locator('.inspector input').first()).toHaveValue('封面确认');
   await expect(page.locator('.canvas-minimap')).toBeVisible();

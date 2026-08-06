@@ -1,0 +1,51 @@
+name: sagnex
+
+services:
+  api:
+    image: sagnex-api:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: api
+    restart: unless-stopped
+    environment:
+      SAGNEX_API_HOST: 0.0.0.0
+      SAGNEX_API_PORT: 4784
+      SAGNEX_DATA_DIR: /data
+      SAGNEX_BACKUP_DIR: /backups
+    volumes:
+      - type: bind
+        source: ${SAGNEX_DATA_PATH:-./docker-data/database}
+        target: /data
+        bind:
+          create_host_path: true
+      - type: bind
+        source: ${SAGNEX_BACKUP_PATH:-./docker-data/backups}
+        target: /backups
+        bind:
+          create_host_path: true
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4784/api/health').then((response) => { if (!response.ok) process.exit(1); }).catch(() => process.exit(1));"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 10s
+
+  web:
+    image: sagnex-web:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: web
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${SAGNEX_BIND_ADDRESS:-127.0.0.1}:${SAGNEX_WEB_PORT:-4173}:80"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/api/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 5s

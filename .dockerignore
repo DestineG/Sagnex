@@ -1,0 +1,17 @@
+.git
+.gitignore
+.env
+.env.*
+!.env.docker.example
+**/node_modules
+**/dist
+coverage
+docker-data
+playwright-report
+test-results
+*.log
+*.sqlite
+*.sqlite3
+*.db
+*.db-shm
+*.db-wal

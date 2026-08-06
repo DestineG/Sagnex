@@ -42,6 +42,37 @@ pnpm start
 
 数据页会显示当前生效的恢复前安全备份目录。启动参数变化需要重启 Sagnex。
 
+## Docker Compose
+
+需要 Docker Desktop（Windows）或 Docker Engine 与 Compose 插件（Ubuntu）。默认只监听 `127.0.0.1:4173`，数据库和恢复备份分别保存在仓库下的 `docker-data/database` 与 `docker-data/backups`。
+
+Windows PowerShell：
+
+```powershell
+.\docker-start.ps1
+.\docker-update.ps1
+.\docker-stop.ps1
+```
+
+Ubuntu：
+
+```bash
+./docker-start.sh
+./docker-update.sh
+./docker-stop.sh
+```
+
+启动脚本会构建并启动服务；更新脚本会刷新基础镜像、重建当前工作区并滚动重启；停止脚本不会删除数据库、备份目录或本地镜像。仓库没有配置远程地址，因此更新脚本不会执行 `git pull`。
+
+默认配置无需创建额外文件。需要更换端口、监听地址或数据目录时，将 `.env.docker.example` 复制为 `.env` 后修改。例如 Windows 绝对路径可以写成 `D:/Sagnex/data`，Ubuntu 可以写成 `/srv/sagnex/data`。如需从局域网访问，将 `SAGNEX_BIND_ADDRESS` 改为 `0.0.0.0`，并自行配置防火墙访问规则。
+
+直接使用 Compose 也可以：
+
+```bash
+docker compose up -d --build --wait
+docker compose down
+```
+
 ## 验证
 
 ```powershell

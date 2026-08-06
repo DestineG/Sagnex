@@ -36,4 +36,36 @@ describe('API', () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({ databasePath: ':memory:', backupDirectory: null });
   });
+
+  it('allows requests from the same host through a reverse proxy', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/health',
+      headers: {
+        origin: 'http://192.168.1.20:4173',
+        host: '192.168.1.20:4173'
+      }
+    });
+    expect(response.statusCode, response.body).toBe(200);
+    expect(response.headers['access-control-allow-origin']).toBe('http://192.168.1.20:4173');
+  });
+
+  it('continues to allow the local development origin', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/health',
+      headers: { origin: 'http://127.0.0.1:4173', host: '127.0.0.1:4784' }
+    });
+    expect(response.statusCode, response.body).toBe(200);
+  });
+
+  it('rejects requests from an unrelated origin', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/health',
+      headers: { origin: 'https://example.com', host: '192.168.1.20:4173' }
+    });
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({ message: 'Origin not allowed' });
+  });
 });

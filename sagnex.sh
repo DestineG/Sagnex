@@ -2,4 +2,4 @@
 set -euo pipefail
 
 root_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-exec "$root_dir/scripts/sagnex.sh" "$@"
+exec "$root_dir/scripts/launcher.sh" "$@"

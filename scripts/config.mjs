@@ -1,20 +1,11 @@
-import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 export const rootDirectory = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-export const configDirectory = resolve(rootDirectory, 'config');
-export const configPath = resolve(configDirectory, 'sagnex.env');
-export const configExamplePath = resolve(configDirectory, 'sagnex.env.example');
-
-export function ensureConfig() {
-  mkdirSync(configDirectory, { recursive: true });
-  if (!existsSync(configPath)) {
-    copyFileSync(configExamplePath, configPath);
-    globalThis.console.log(`Created configuration: ${configPath}`);
-  }
-}
+const configDirectory = resolve(rootDirectory, 'config');
+const configPath = resolve(configDirectory, 'sagnex.env');
 
 function parseEnvironmentFile(contents) {
   const values = {};
@@ -47,11 +38,11 @@ function resolveProjectPath(value, fallback) {
   return isAbsolute(path) ? resolve(path) : resolve(rootDirectory, path);
 }
 
-export function loadConfig({ create = true } = {}) {
-  if (create) ensureConfig();
-  const fileValues = existsSync(configPath)
-    ? parseEnvironmentFile(readFileSync(configPath, 'utf8'))
-    : {};
+export function loadConfig() {
+  if (!existsSync(configPath)) {
+    throw new Error(`Configuration is missing. Run sagnex config first: ${configPath}`);
+  }
+  const fileValues = parseEnvironmentFile(readFileSync(configPath, 'utf8'));
   const value = (name, fallback) => process.env[name] ?? fileValues[name] ?? fallback;
   const dataDirectory = resolveProjectPath(value('SAGNEX_DATA_DIR', './data'), './data');
   const backupDirectory = resolveProjectPath(value('SAGNEX_BACKUP_DIR', './data/backups'), './data/backups');

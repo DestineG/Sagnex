@@ -4,14 +4,48 @@ $rootDirectory = Split-Path -Parent $PSScriptRoot
 $configDirectory = Join-Path $rootDirectory 'config'
 $configPath = Join-Path $configDirectory 'sagnex.env'
 $configExamplePath = Join-Path $configDirectory 'sagnex.env.example'
-$composeFile = Join-Path $rootDirectory 'compose.yaml'
+$composeFile = Join-Path $rootDirectory 'docker\compose.yaml'
 
-function Initialize-Config {
+function Copy-DefaultConfig {
   New-Item -ItemType Directory -Path $configDirectory -Force | Out-Null
+  Copy-Item -LiteralPath $configExamplePath -Destination $configPath -Force
+  Write-Host "Created configuration: $configPath"
+}
+
+function Test-InteractiveInput {
+  try { return -not [Console]::IsInputRedirected } catch { return $true }
+}
+
+function Invoke-ConfigAction {
   if (-not (Test-Path -LiteralPath $configPath)) {
-    Copy-Item -LiteralPath $configExamplePath -Destination $configPath
-    Write-Host "Created configuration: $configPath"
+    Copy-DefaultConfig
+    return
   }
+  if (-not (Test-InteractiveInput)) {
+    Write-Host "Configuration already exists and was not replaced: $configPath"
+    return
+  }
+  $answer = Read-Host 'Configuration already exists. Replace it with the template? Existing settings will be lost. [y/N]'
+  if ($answer -match '^[Yy]$') {
+    Copy-DefaultConfig
+  } else {
+    Write-Host "Configuration was not changed: $configPath"
+  }
+}
+
+function Confirm-ConfigForStart {
+  if (Test-Path -LiteralPath $configPath) { return $true }
+  if (-not (Test-InteractiveInput)) {
+    Write-Host 'Configuration is missing. Run sagnex.cmd config before starting.'
+    return $false
+  }
+  $answer = Read-Host 'No local configuration was found. Create it from the template and continue? [y/N]'
+  if ($answer -notmatch '^[Yy]$') {
+    Write-Host 'Startup cancelled.'
+    return $false
+  }
+  Copy-DefaultConfig
+  return $true
 }
 
 function Read-Config {
@@ -38,18 +72,23 @@ function Invoke-Compose([string[]]$arguments) {
   if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
     throw 'Docker was not found. Install Docker Desktop and ensure docker is on PATH.'
   }
-  $composeArgs = @('compose', '--project-directory', $rootDirectory, '--env-file', $configPath, '-f', $composeFile)
+  $environmentFile = if (Test-Path -LiteralPath $configPath) { $configPath } else { $configExamplePath }
+  $composeArgs = @('compose', '--project-directory', $rootDirectory, '--env-file', $environmentFile, '-f', $composeFile)
   & docker @composeArgs @arguments
   if ($LASTEXITCODE -ne 0) { throw "docker compose $($arguments -join ' ') failed." }
 }
 
 function Invoke-DockerAction([string]$action) {
-  Initialize-Config
-  $config = Read-Config
-  $dataDirectory = Resolve-ProjectPath $config['SAGNEX_DATA_DIR'] './data'
-  $backupDirectory = Resolve-ProjectPath $config['SAGNEX_BACKUP_DIR'] './data/backups'
-  New-Item -ItemType Directory -Path $dataDirectory -Force | Out-Null
-  New-Item -ItemType Directory -Path $backupDirectory -Force | Out-Null
+  if ($action -in @('start', 'update')) {
+    if (-not (Confirm-ConfigForStart)) { exit 1 }
+    $config = Read-Config
+    $dataDirectory = Resolve-ProjectPath $config['SAGNEX_DATA_DIR'] './data'
+    $backupDirectory = Resolve-ProjectPath $config['SAGNEX_BACKUP_DIR'] './data/backups'
+    New-Item -ItemType Directory -Path $dataDirectory -Force | Out-Null
+    New-Item -ItemType Directory -Path $backupDirectory -Force | Out-Null
+    $env:SAGNEX_DATA_DIR = $dataDirectory
+    $env:SAGNEX_BACKUP_DIR = $backupDirectory
+  }
 
   switch ($action) {
     'start' {
@@ -73,7 +112,10 @@ function Invoke-DockerAction([string]$action) {
 
 function Invoke-NativeAction([string]$action) {
   if ($action -notin @('start', 'update', 'stop')) {
-    throw 'Usage: sagnex.cmd [docker] <start|update|stop>'
+    throw 'Usage: sagnex.cmd <config|start|update|stop> or sagnex.cmd docker <start|update|stop>'
+  }
+  if ($action -in @('start', 'update')) {
+    if (-not (Confirm-ConfigForStart)) { exit 1 }
   }
   if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
     throw 'Node.js was not found. Install Node.js 20 or newer.'
@@ -87,6 +129,8 @@ function Invoke-NativeAction([string]$action) {
 $arguments = @($args)
 if ($arguments.Count -eq 0) {
   Invoke-NativeAction 'start'
+} elseif ($arguments[0] -eq 'config') {
+  Invoke-ConfigAction
 } elseif ($arguments[0] -eq 'docker') {
   if ($arguments.Count -lt 2) { throw 'Usage: sagnex.cmd docker <start|update|stop>' }
   Invoke-DockerAction $arguments[1]

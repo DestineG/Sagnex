@@ -5,7 +5,7 @@ services:
     image: sagnex-api:local
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: docker/Dockerfile
       target: api
     restart: unless-stopped
     environment:
@@ -36,7 +36,7 @@ services:
     image: sagnex-web:local
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: docker/Dockerfile
       target: web
     restart: unless-stopped
     depends_on:

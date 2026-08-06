@@ -4,7 +4,13 @@ Sagnex 是一款本地优先的事件规划工具。它使用任务依赖图组�
 
 ## 非 Docker 启动
 
-需要 Node.js 20+。Windows 双击 `sagnex.cmd`，或在终端执行：
+需要 Node.js 20+。首次使用可先生成本机配置：
+
+```powershell
+.\sagnex.cmd config
+```
+
+按需修改 `config/sagnex.env` 后启动：
 
 ```powershell
 .\sagnex.cmd start
@@ -13,10 +19,12 @@ Sagnex 是一款本地优先的事件规划工具。它使用任务依赖图组�
 Ubuntu 执行：
 
 ```bash
+./sagnex.sh config
+# 按需修改 config/sagnex.env
 ./sagnex.sh start
 ```
 
-首次启动会自动创建本机配置、安装依赖并构建。启动完成后访问 `http://127.0.0.1:4173`。
+如果直接执行 `start` 且配置不存在，脚本会询问是否从模板创建配置并继续。首次启动会自动安装依赖并构建，完成后访问 `http://127.0.0.1:4173`。
 
 ## Docker 启动
 
@@ -25,13 +33,17 @@ Ubuntu 执行：
 Windows 执行：
 
 ```powershell
+.\sagnex.cmd config
+# 按需修改 config/sagnex.env
 .\sagnex.cmd docker start
 ```
 
 Ubuntu 执行：
 
 ```bash
+./sagnex.sh config
+# 按需修改 config/sagnex.env
 ./sagnex.sh docker start
 ```
 
-首次启动会自动创建本机配置、构建镜像并启动容器。启动完成后访问 `http://127.0.0.1:4173`。
+如果配置不存在，`docker start` 同样会先询问。首次启动会构建镜像并启动容器，完成后访问 `http://127.0.0.1:4173`。

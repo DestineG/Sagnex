@@ -64,6 +64,12 @@ test('renders active cards and editor across desktop and mobile', async ({ page,
   const activeDownload = await activeDownloadPromise;
   await activeDownload.saveAs('test-results/active-export.png');
   expect((await stat('test-results/active-export.png')).size).toBeGreaterThan(5_000);
+  await page.goto('/events');
+  const eventTile = page.locator('.event-tile').filter({ hasText: eventTitle });
+  await expect(eventTile.locator('.status-overview-node')).toHaveCount(4);
+  await expect(eventTile.locator('.status-overview-edges path')).toHaveCount(4);
+  await expect(eventTile.locator('.status-overview-graph text')).toHaveCount(0);
+  await page.screenshot({ path: 'test-results/events-desktop.png', fullPage: true });
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(`/events/${event.id}?task=${third.id}`);
   await expect(page.locator('.inspector input').first()).toHaveValue('封面确认');
@@ -121,6 +127,9 @@ test('renders active cards and editor across desktop and mobile', async ({ page,
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
   await page.screenshot({ path: 'test-results/active-mobile.png', fullPage: true });
+  await page.goto('/events');
+  await expect(page.locator('.event-tile').filter({ hasText: eventTitle }).locator('.status-overview-node')).toHaveCount(4);
+  await page.screenshot({ path: 'test-results/events-mobile.png', fullPage: true });
   await page.goto(`/events/${event.id}?task=${third.id}`);
   await expect(page.locator('.canvas-minimap')).not.toBeVisible();
   await page.screenshot({ path: 'test-results/editor-mobile.png', fullPage: true });

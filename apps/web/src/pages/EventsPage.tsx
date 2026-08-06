@@ -8,6 +8,7 @@ import { Dialog } from '../components/Dialog';
 import { EventFormDialog } from '../components/EventFormDialog';
 import { EventTagSummary } from '../components/EventTagSummary';
 import { LabelPicker } from '../components/LabelPicker';
+import { StatusOverviewGraph } from '../components/StatusOverviewGraph';
 
 type StatusFilter = 'all' | EventStatus | 'archived';
 
@@ -19,7 +20,7 @@ export function EventsPage() {
   const [labelId, setLabelId] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
-  const { data: allEvents = [], isLoading } = useQuery({ queryKey: ['events', 'all'], queryFn: () => api.listEvents() });
+  const { data: allEvents = [], isLoading } = useQuery({ queryKey: ['events', 'all'], queryFn: () => api.listEvents('?preview=full') });
   const { data: labels = [] } = useQuery({ queryKey: ['labels'], queryFn: api.listLabels });
   const events = useMemo(() => allEvents.filter((event) => {
     if (status === 'archived' ? !event.archivedAt : event.archivedAt) return false;
@@ -53,6 +54,7 @@ export function EventsPage() {
         <header className="event-tile-head"><strong>{event.title}</strong><span className={`status-badge status-${event.status}`}>{eventStatusText[event.status]}</span></header>
         <p className="event-tile-description">{event.description || '暂无简介'}</p>
         <EventTagSummary labels={event.labels} className="event-tile-tags" />
+        <StatusOverviewGraph tasks={event.previewTasks} dependencies={event.previewDependencies} onTaskClick={(taskId) => navigate(`/events/${event.id}?task=${taskId}`, { state: { returnTo: '/events' } })} />
         <footer className="event-tile-foot">
           <span>{event.completedTasks} / {event.totalTasks}</span>
           <span className="progress"><i style={{ width: `${event.totalTasks ? (event.completedTasks / event.totalTasks) * 100 : 0}%` }} /></span>

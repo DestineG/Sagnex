@@ -66,14 +66,16 @@ export function createApp(context: DatabaseContext, options: { fetcher?: typeof 
       status: eventStatusSchema.optional(),
       labelId: z.string().uuid().optional(),
       archived: z.enum(['true', 'false']).optional(),
-      active: z.enum(['true', 'false']).optional()
+      active: z.enum(['true', 'false']).optional(),
+      preview: z.enum(['focused', 'full']).optional()
     }).parse(request.query);
     return store.listEvents({
       search: query.search,
       status: query.status,
       labelId: query.labelId,
       archived: query.archived === undefined ? undefined : query.archived === 'true',
-      active: query.active === 'true'
+      active: query.active === 'true',
+      preview: query.preview
     });
   });
   app.post('/api/events', async (request, reply) => reply.status(201).send(await store.createEvent(createEventInputSchema.parse(request.body))));

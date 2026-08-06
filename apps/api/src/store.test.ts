@@ -55,6 +55,18 @@ describe('SagnexStore', () => {
     expect((await store.listEvents({ active: true })).map((event) => event.title)).toEqual(['已暂停']);
   });
 
+  it('returns every task when a full event preview is requested', async () => {
+    const event = await store.createEvent({ title: '完整缩略图', description: '', labelIds: [] });
+    for (let index = 0; index < 10; index += 1) {
+      await store.createTask(event.id, { title: `任务 ${index + 1}`, description: '', positionX: index * 220, positionY: 0 });
+    }
+
+    const focused = (await store.listEvents()).find((item) => item.id === event.id)!;
+    const full = (await store.listEvents({ preview: 'full' })).find((item) => item.id === event.id)!;
+    expect(focused.previewTasks).toHaveLength(8);
+    expect(full.previewTasks).toHaveLength(10);
+  });
+
   it('requires confirmation for unmet soft dependencies', async () => {
     const event = await store.createEvent({ title: '发布', description: '', labelIds: [] });
     const first = await store.createTask(event.id, { title: '前置', description: '', positionX: 0, positionY: 0 });

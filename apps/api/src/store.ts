@@ -40,6 +40,7 @@ interface EventFilters {
   labelId?: string;
   archived?: boolean;
   active?: boolean;
+  preview?: 'focused' | 'full';
 }
 
 const now = () => new Date().toISOString();
@@ -139,7 +140,9 @@ export class SagnexStore {
       const eventLabelRows = labelRows.filter((label) => ids.has(label.id));
       const status = calculateEventStatus(eventTasks);
       const progress = getProgress(eventTasks);
-      const previewIds = selectPreviewTaskIds(eventTasks, eventDependencies);
+      const previewIds = filters.preview === 'full'
+        ? new Set(eventTasks.map((task) => task.id))
+        : selectPreviewTaskIds(eventTasks, eventDependencies);
       return {
         ...event,
         status,

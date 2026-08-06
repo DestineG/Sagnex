@@ -1,13 +1,16 @@
 FROM node:22-bookworm-slim AS build
 
+ARG SAGNEX_APT_MIRROR=https://mirrors.tuna.tsinghua.edu.cn
+ARG SAGNEX_NPM_REGISTRY=https://registry.npmmirror.com
+
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 
-RUN apt-get update \
+RUN sed -i -E "s|https?://deb.debian.org|${SAGNEX_APT_MIRROR}|g" /etc/apt/sources.list.d/debian.sources \
+    && apt-get update \
     && apt-get install -y --no-install-recommends g++ make python3 \
     && rm -rf /var/lib/apt/lists/* \
-    && corepack enable \
-    && corepack prepare pnpm@11.9.0 --activate
+    && npm install --global pnpm@11.9.0 --registry="${SAGNEX_NPM_REGISTRY}"
 
 WORKDIR /app
 
@@ -15,7 +18,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/api/package.json apps/api/package.json
 COPY apps/web/package.json apps/web/package.json
 COPY packages/contracts/package.json packages/contracts/package.json
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile --registry="${SAGNEX_NPM_REGISTRY}"
 
 COPY . .
 RUN pnpm build

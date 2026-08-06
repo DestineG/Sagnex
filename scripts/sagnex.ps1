@@ -52,6 +52,10 @@ function Invoke-DockerAction([string]$action) {
   New-Item -ItemType Directory -Path $backupDirectory -Force | Out-Null
 
   switch ($action) {
+    'build' {
+      Invoke-Compose @('build')
+      Write-Host 'Built Docker images: sagnex-api:local and sagnex-web:local'
+    }
     'start' {
       Invoke-Compose @('up', '-d', '--build', '--remove-orphans', '--wait')
       $binding = (& docker compose --project-directory $rootDirectory --env-file $configPath -f $composeFile port web 80)
@@ -67,13 +71,13 @@ function Invoke-DockerAction([string]$action) {
       Invoke-Compose @('down', '--remove-orphans')
       Write-Host 'Sagnex stopped. Data was preserved.'
     }
-    default { throw 'Usage: sagnex.cmd [docker] <start|update|stop>' }
+    default { throw 'Usage: sagnex.cmd docker <build|start|update|stop>' }
   }
 }
 
 function Invoke-NativeAction([string]$action) {
   if ($action -notin @('start', 'update', 'stop')) {
-    throw 'Usage: sagnex.cmd [docker] <start|update|stop>'
+    throw 'Usage: sagnex.cmd <start|update|stop>'
   }
   if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
     throw 'Node.js was not found. Install Node.js 20 or newer.'
@@ -88,7 +92,7 @@ $arguments = @($args)
 if ($arguments.Count -eq 0) {
   Invoke-NativeAction 'start'
 } elseif ($arguments[0] -eq 'docker') {
-  if ($arguments.Count -lt 2) { throw 'Usage: sagnex.cmd docker <start|update|stop>' }
+  if ($arguments.Count -lt 2) { throw 'Usage: sagnex.cmd docker <build|start|update|stop>' }
   Invoke-DockerAction $arguments[1]
 } else {
   Invoke-NativeAction $arguments[0]

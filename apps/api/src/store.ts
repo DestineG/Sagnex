@@ -127,6 +127,9 @@ export class SagnexStore {
       this.context.db.select().from(eventLabels)
     ]);
     const search = filters.search?.trim().toLocaleLowerCase();
+    const activeEventIds = filters.active
+      ? new Set(taskRows.filter((task) => task.status === 'in_progress' || task.status === 'paused').map((task) => task.eventId))
+      : null;
     const result = eventRows.map((event) => {
       const eventTasks = taskRows.filter((task) => task.eventId === event.id) as Task[];
       const eventDependencies = dependencyRows.filter((dependency) => dependency.eventId === event.id) as Dependency[];
@@ -145,7 +148,7 @@ export class SagnexStore {
       } satisfies EventSummary;
     });
     return result.filter((event) => {
-      if (filters.active && (event.archivedAt !== null || event.status === 'completed')) return false;
+      if (filters.active && (event.archivedAt !== null || !activeEventIds?.has(event.id))) return false;
       if (filters.archived !== undefined && (event.archivedAt !== null) !== filters.archived) return false;
       if (filters.status && event.status !== filters.status) return false;
       if (filters.labelId && !event.labels.some((label) => label.id === filters.labelId)) return false;

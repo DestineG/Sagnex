@@ -1,5 +1,4 @@
 import type { LabelIcon } from '@sagnex/contracts';
-import DOMPurify from 'dompurify';
 import {
   BookOpen,
   BriefcaseBusiness,
@@ -23,6 +22,7 @@ import {
   WalletCards,
   type LucideIcon
 } from 'lucide-react';
+import { sanitizeLabelSvg } from './labelSvg';
 
 export const labelIconOptions: Array<{ value: LabelIcon; label: string; icon: LucideIcon }> = [
   { value: 'tag', label: '标签', icon: Tag },
@@ -54,11 +54,7 @@ export function LabelIconView({ icon, className }: { icon: LabelIcon; className?
     return <span className={`label-emoji ${className ?? ''}`} aria-hidden="true">{icon.slice(6)}</span>;
   }
   if (icon.startsWith('svg:')) {
-    const markup = DOMPurify.sanitize(icon.slice(4), {
-      USE_PROFILES: { svg: true, svgFilters: false },
-      FORBID_TAGS: ['script', 'foreignObject', 'style', 'image', 'use'],
-      FORBID_ATTR: ['href', 'xlink:href', 'style']
-    });
+    const markup = sanitizeLabelSvg(icon.slice(4));
     return <span className={`label-custom-svg ${className ?? ''}`} aria-hidden="true" dangerouslySetInnerHTML={{ __html: markup }} />;
   }
   const Icon = iconMap[icon] ?? Tag;

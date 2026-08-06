@@ -1,5 +1,5 @@
 import type { Label } from '@sagnex/contracts';
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { LabelIconView } from './LabelIcon';
 
 const TAG_GAP = 6;
@@ -42,9 +42,13 @@ export function layoutTagRows(widths: number[], availableWidth: number, overflow
 }
 
 function TagChip({ label, measure = false }: { label: Label; measure?: boolean }) {
-  return <span className="tag" title={measure ? undefined : label.name} data-tag-measure={measure ? '' : undefined}>
-    <LabelIconView icon={label.icon} />
-    <i style={{ background: label.color }} />
+  return <span
+    className="tag label-tag"
+    title={measure ? undefined : label.name}
+    data-tag-measure={measure ? '' : undefined}
+    style={{ '--label-color': label.color } as CSSProperties}
+  >
+    <span className="label-tag-icon"><LabelIconView icon={label.icon} /></span>
     <span className="tag-name">{label.name}</span>
   </span>;
 }

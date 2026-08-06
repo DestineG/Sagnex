@@ -28,6 +28,29 @@ describe('SagnexStore', () => {
     expect(await store.getTaskHistory(task.id)).toHaveLength(2);
   });
 
+  it('only treats events with running or paused tasks as active', async () => {
+    const creating = await store.createEvent({ title: '待规划', description: '', labelIds: [] });
+    await store.createTask(creating.id, { title: '未开始', description: '', positionX: 0, positionY: 0 });
+
+    const running = await store.createEvent({ title: '推进中', description: '', labelIds: [] });
+    const runningTask = await store.createTask(running.id, { title: '执行', description: '', positionX: 0, positionY: 0 });
+    await store.transitionTask(runningTask.id, 'in_progress', false);
+
+    const paused = await store.createEvent({ title: '已暂停', description: '', labelIds: [] });
+    const pausedTask = await store.createTask(paused.id, { title: '等待恢复', description: '', positionX: 0, positionY: 0 });
+    await store.transitionTask(pausedTask.id, 'in_progress', false);
+    await store.transitionTask(pausedTask.id, 'paused', false);
+
+    const betweenSteps = await store.createEvent({ title: '阶段间隔', description: '', labelIds: [] });
+    const completedTask = await store.createTask(betweenSteps.id, { title: '已完成', description: '', positionX: 0, positionY: 0 });
+    await store.createTask(betweenSteps.id, { title: '未开始', description: '', positionX: 200, positionY: 0 });
+    await store.transitionTask(completedTask.id, 'in_progress', false);
+    await store.transitionTask(completedTask.id, 'completed', false);
+
+    await store.setArchived(running.id, true);
+    expect((await store.listEvents({ active: true })).map((event) => event.title)).toEqual(['已暂停']);
+  });
+
   it('requires confirmation for unmet soft dependencies', async () => {
     const event = await store.createEvent({ title: '发布', description: '', labelIds: [] });
     const first = await store.createTask(event.id, { title: '前置', description: '', positionX: 0, positionY: 0 });
@@ -91,8 +114,10 @@ describe('SagnexStore', () => {
     const label = await store.createLabel({
       name: '自定义',
       color: '#176b4b',
-      icon: 'svg:<svg viewBox="0 0 24 24" onclick="alert(1)"><script>alert(1)</script><path d="M2 2h20v20z" /></svg>'
+      icon: 'svg:<!-- icon metadata --><svg viewBox="0 0 24 24" onclick="alert(1)"><script>alert(1)</script><path d="M2 2h20v20z" /></svg>'
     });
+    expect(label.icon).toMatch(/^svg:<svg/);
+    expect(label.icon).not.toContain('metadata');
     expect(label.icon).toContain('<path');
     expect(label.icon).not.toContain('script');
     expect(label.icon).not.toContain('onclick');

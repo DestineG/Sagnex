@@ -10,9 +10,11 @@ test('completes the local event workflow', async ({ page, request }) => {
   await page.getByRole('button', { name: '新建标签' }).first().click();
   await page.getByLabel('名称').fill(labelName);
   await page.getByLabel('自定义颜色').fill('#4b62a8');
-  await page.getByRole('button', { name: '选择图标 目标' }).click();
+  await page.getByRole('tab', { name: 'SVG' }).click();
+  await page.getByLabel('SVG 标签').fill('<!-- tags: [test] --><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 3h18v18H3z" /></svg>');
   await page.getByRole('button', { name: '保存' }).click();
   await expect(page.getByText(labelName)).toBeVisible();
+  await expect(page.locator('.label-row').filter({ hasText: labelName }).locator('.label-name > i')).toHaveCount(0);
 
   await page.getByRole('link', { name: '事件' }).click();
   await page.getByRole('button', { name: '新建事件' }).first().click();
@@ -68,6 +70,9 @@ test('completes the local event workflow', async ({ page, request }) => {
 
   await page.getByRole('link', { name: '活跃' }).click();
   await expect(page.getByText(eventTitle)).toBeVisible();
+  const activeCard = page.getByRole('article').filter({ hasText: eventTitle });
+  await expect(activeCard.locator('.event-tag-row .label-tag-icon')).toBeVisible();
+  await expect(activeCard.locator('.label-tag > i')).toHaveCount(0);
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: '导出快照' }).click();
   const download = await downloadPromise;
@@ -75,7 +80,7 @@ test('completes the local event workflow', async ({ page, request }) => {
   expect(downloadPath).not.toBeNull();
   expect((await stat(downloadPath!)).size).toBeGreaterThan(1000);
 
-  await page.getByRole('article').filter({ hasText: eventTitle }).getByRole('button', { name: '后续任务，进行中' }).click();
+  await activeCard.getByRole('button', { name: '后续任务，进行中' }).click();
   await expect(page).toHaveURL(new RegExp(`task=${target.id}`));
   await expect(page.locator('.inspector input').first()).toHaveValue('后续任务');
   const archiveResponse = page.waitForResponse((response) => response.url().endsWith(`/api/events/${eventId}/archive`));

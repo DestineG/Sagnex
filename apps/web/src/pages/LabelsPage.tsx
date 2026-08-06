@@ -5,6 +5,7 @@ import { useRef, useState, type FormEvent } from 'react';
 import { api } from '../api';
 import { Dialog } from '../components/Dialog';
 import { LabelIconView, labelIconOptions } from '../components/LabelIcon';
+import { normalizeLabelSvg } from '../components/labelSvg';
 
 const colors = ['#176b4b', '#28748f', '#386b9e', '#4b62a8', '#6957a6', '#8c4f8f', '#a63d65', '#a63d43', '#b5532d', '#a65d17', '#9a7b18', '#718047', '#247b7b', '#47765a', '#6c6f75', '#3f4742'];
 
@@ -24,9 +25,16 @@ function LabelDialog({ label, onClose, onSave }: { label?: Label; onClose: () =>
     event.preventDefault();
     if (!name.trim()) return;
     if (!/^#[0-9a-fA-F]{6}$/.test(color)) { setError('请输入有效的十六进制颜色'); return; }
-    const icon = iconMode === 'builtin' ? builtinIcon : iconMode === 'emoji' ? `emoji:${emoji.trim()}` : `svg:${svgText.trim()}`;
     if (iconMode === 'emoji' && !emoji.trim()) { setError('请输入一个 Emoji'); return; }
-    if (iconMode === 'svg' && !/^<svg(?:\s|>)/i.test(svgText.trim())) { setError('请粘贴完整的 SVG 标签'); return; }
+    let icon: LabelIcon;
+    if (iconMode === 'builtin') icon = builtinIcon;
+    else if (iconMode === 'emoji') icon = `emoji:${emoji.trim()}`;
+    else {
+      try { icon = `svg:${normalizeLabelSvg(svgText)}`; } catch (cause) {
+        setError(cause instanceof Error ? cause.message : '请粘贴完整的 SVG 标签');
+        return;
+      }
+    }
     setBusy(true);
     try { await onSave({ name: name.trim(), color, icon }); } catch (cause) { setError(cause instanceof Error ? cause.message : '保存失败'); setBusy(false); }
   }
@@ -77,7 +85,7 @@ export function LabelsPage() {
     <header className="page-head"><div><h1>标签</h1><p>管理事件分类</p></div><button className="button primary" onClick={() => setEditing('new')}><Plus />新建标签</button></header>
     {isLoading ? <div className="empty-state">正在加载...</div> : labels.length === 0 ? <div className="empty-state"><h2>还没有标签</h2><button className="button primary" onClick={() => setEditing('new')}><Plus />新建标签</button></div> : <div className="label-list">
       {labels.map((label) => <div className="label-row" key={label.id}>
-        <span className="label-name"><span className="label-symbol" style={{ color: label.color }}><LabelIconView icon={label.icon} /></span><i style={{ background: label.color }} />{label.name}</span>
+        <span className="label-name"><span className="label-symbol" style={{ color: label.color }}><LabelIconView icon={label.icon} /></span>{label.name}</span>
         <span className="muted">{label.usageCount} 个事件</span>
         <time className="muted">{new Date(label.createdAt).toLocaleDateString('zh-CN')}</time>
         <div className="row-actions"><button className="icon-button" aria-label={`编辑${label.name}`} data-tooltip="编辑标签" onClick={() => setEditing(label)}><Pencil /></button><button className="icon-button danger" aria-label={`删除${label.name}`} data-tooltip="删除标签" onClick={() => setDeleting(label)}><Trash2 /></button></div>

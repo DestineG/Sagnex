@@ -3,8 +3,10 @@ import { stat } from 'node:fs/promises';
 
 test('renders active cards and editor across desktop and mobile', async ({ page, request }) => {
   const eventTitle = `秋季版本发布-${Date.now().toString().slice(-6)}`;
+  const createdEventIds: string[] = [];
   const eventResponse = await request.post('/api/events', { data: { title: eventTitle, description: '完成发布内容、渠道和上线检查', labelIds: [] } });
   const event = await eventResponse.json();
+  createdEventIds.push(event.id);
   const firstResponse = await request.post(`/api/events/${event.id}/tasks`, { data: { title: '需求确认', description: '', positionX: 60, positionY: 150 } });
   const first = await firstResponse.json();
   const secondResponse = await request.post(`/api/events/${event.id}/tasks`, { data: { title: '内容校对', description: '检查正文、链接与发布渠道中的文案', positionX: 300, positionY: 80 } });
@@ -21,9 +23,34 @@ test('renders active cards and editor across desktop and mobile', async ({ page,
   await request.post(`/api/tasks/${first.id}/transition`, { data: { toStatus: 'completed', confirmSoftDependencies: false } });
   await request.post(`/api/tasks/${third.id}/transition`, { data: { toStatus: 'in_progress', confirmSoftDependencies: false } });
 
+  const createEventWithTask = async (title: string, status: 'not_started' | 'in_progress' | 'paused') => {
+    const created = await (await request.post('/api/events', { data: { title, description: '', labelIds: [] } })).json();
+    createdEventIds.push(created.id);
+    const task = await (await request.post(`/api/events/${created.id}/tasks`, { data: { title: `${title}-任务`, description: '', positionX: 80, positionY: 100 } })).json();
+    if (status !== 'not_started') await request.post(`/api/tasks/${task.id}/transition`, { data: { toStatus: 'in_progress', confirmSoftDependencies: false } });
+    if (status === 'paused') await request.post(`/api/tasks/${task.id}/transition`, { data: { toStatus: 'paused', confirmSoftDependencies: false } });
+    return created;
+  };
+  const extraActiveTitles = [`运行事件甲-${Date.now()}`, `运行事件乙-${Date.now()}`, `暂停事件-${Date.now()}`];
+  await createEventWithTask(extraActiveTitles[0]!, 'in_progress');
+  await createEventWithTask(extraActiveTitles[1]!, 'in_progress');
+  await createEventWithTask(extraActiveTitles[2]!, 'paused');
+  const planningTitle = `待规划事件-${Date.now()}`;
+  await createEventWithTask(planningTitle, 'not_started');
+  const betweenStepsTitle = `阶段间隔事件-${Date.now()}`;
+  const betweenSteps = await createEventWithTask(betweenStepsTitle, 'in_progress');
+  const betweenGraph = await (await request.get(`/api/events/${betweenSteps.id}`)).json();
+  await request.post(`/api/tasks/${betweenGraph.tasks[0].id}/transition`, { data: { toStatus: 'completed', confirmSoftDependencies: false } });
+  await request.post(`/api/events/${betweenSteps.id}/tasks`, { data: { title: '下一阶段', description: '', positionX: 300, positionY: 100 } });
+
   await page.setViewportSize({ width: 2560, height: 1080 });
   await page.goto('/');
   await expect(page.getByText(eventTitle)).toBeVisible();
+  await expect(page.getByText(planningTitle)).toHaveCount(0);
+  await expect(page.getByText(betweenStepsTitle)).toHaveCount(0);
+  const activeCardBoxes = await Promise.all([eventTitle, ...extraActiveTitles].map(async (title) => page.locator('.event-card').filter({ hasText: title }).boundingBox()));
+  expect(activeCardBoxes.every((box) => box !== null)).toBe(true);
+  expect(new Set(activeCardBoxes.map((box) => Math.round(box!.y))).size).toBe(1);
   await expect(page.getByText(/尚未完成的事件/)).toHaveCount(0);
   await expect(page.locator('.event-card').filter({ hasText: eventTitle }).locator('.graph-edges path')).toHaveCount(4);
   const mainBox = await page.locator('.main-content').boundingBox();
@@ -98,6 +125,8 @@ test('renders active cards and editor across desktop and mobile', async ({ page,
   await expect(page.locator('.canvas-minimap')).not.toBeVisible();
   await page.screenshot({ path: 'test-results/editor-mobile.png', fullPage: true });
 
-  await request.post(`/api/events/${event.id}/archive`);
-  await request.delete(`/api/events/${event.id}`);
+  for (const eventId of createdEventIds) {
+    await request.post(`/api/events/${eventId}/archive`);
+    await request.delete(`/api/events/${eventId}`);
+  }
 });

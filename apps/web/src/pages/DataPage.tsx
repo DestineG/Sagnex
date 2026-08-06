@@ -136,17 +136,17 @@ export function DataPage() {
   }
 
   return <section className="page data-page">
-    <header className="page-head data-page-head"><div><h1>数据与备份</h1><p>本地导入导出与 WebDAV 云备份</p></div></header>
+    <header className="page-head data-page-head"><div><h1>数据与备份</h1><p>管理本地数据文件与云端备份</p></div></header>
     <div className="data-layout">
       <section className="local-backup-bar">
-        <div className="local-backup-title"><span className="data-panel-icon"><Database /></span><div><h2>本地数据</h2><p>完整 JSON 可离线保存和迁移</p></div></div>
+        <div className="local-backup-title"><span className="data-panel-icon"><Database /></span><div><h2>本地数据与文件</h2><p>查看存储位置，导入或导出完整数据</p></div></div>
         <div className="local-backup-summary"><Server /><div><strong>{isLoading ? '读取中...' : `${info?.eventCount ?? 0} 个事件 · ${info?.taskCount ?? 0} 个任务 · ${info?.labelCount ?? 0} 个标签`}</strong><div className="path-list"><p title={info?.databasePath}>数据库：{info?.databasePath}</p><p title={info?.backupDirectory ?? undefined}>恢复前备份：{info?.backupDirectory ?? '内存数据库不创建副本'}</p></div></div></div>
         <div className="local-backup-actions"><button className="button primary" onClick={() => exportBackup.mutate()} disabled={exportBackup.isPending}><Download />导出 JSON</button><button className="button" onClick={() => fileRef.current?.click()}><FileUp />导入备份</button><input ref={fileRef} className="sr-only" type="file" accept="application/json,.json" onChange={(event) => void selectFile(event.target.files?.[0])} /></div>
         <ModuleNotice notice={notice} scope="local" />
       </section>
 
       <section className="webdav-workspace">
-        <header className="webdav-heading"><div className="webdav-heading-title"><span className="data-panel-icon cloud"><Cloud /></span><div><h2>WebDAV 备份</h2><p>手动创建和按版本恢复</p></div></div><button className="icon-button" data-tooltip="刷新备份" aria-label="刷新备份" onClick={() => backups.refetch()} disabled={!connected || backups.isFetching}><RefreshCw /></button></header>
+        <header className="webdav-heading"><div className="webdav-heading-title"><span className="data-panel-icon cloud"><Cloud /></span><div><h2>WebDAV 云备份</h2><p>连接云端空间，创建和恢复备份版本</p></div></div><button className="icon-button" data-tooltip="刷新备份" aria-label="刷新备份" onClick={() => backups.refetch()} disabled={!connected || backups.isFetching}><RefreshCw /></button></header>
         <div className="webdav-config-block">
           <div className="section-label"><h3>连接配置</h3><span>{connected ? '本次运行已设置密码' : '需要应用专用密码'}</span></div>
           <div className="webdav-form">

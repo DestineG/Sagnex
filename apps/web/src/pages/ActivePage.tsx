@@ -67,12 +67,22 @@ export function ActivePage() {
           {events.map((event) => <article className="event-card" key={event.id}>
             <button className="event-card-open" type="button" aria-label={`打开${event.title}`} onClick={() => navigate(`/events/${event.id}`)} />
             <div className="event-card-head">
-              <div className="event-title-row"><h2>{event.title}</h2><span className={`status-badge status-${event.status}`}>{eventStatusText[event.status]}</span></div>
-              <p>{event.description || '暂无简介'}</p>
-              <div className="tag-row">{event.labels.map((label) => <span className="tag" key={label.id}><LabelIconView icon={label.icon} /><i style={{ background: label.color }} />{label.name}</span>)}</div>
+              <div className="event-card-summary">
+                <h2>{event.title}</h2>
+                <p>{event.description || '暂无简介'}</p>
+                <div className="event-card-tags" title={event.labels.map((label) => label.name).join('、')}>
+                  {event.labels.slice(0, 2).map((label) => <span className="tag" key={label.id}><LabelIconView icon={label.icon} /><i style={{ background: label.color }} /><span className="tag-name">{label.name}</span></span>)}
+                  {event.labels.length > 2 && <span className="tag tag-count">+{event.labels.length - 2}</span>}
+                </div>
+              </div>
+              <div className="event-card-progress">
+                <span className={`status-badge status-${event.status}`}>{eventStatusText[event.status]}</span>
+                <strong>{event.completedTasks} / {event.totalTasks}</strong>
+                <span className="progress"><i style={{ width: `${event.totalTasks ? (event.completedTasks / event.totalTasks) * 100 : 0}%` }} /></span>
+              </div>
             </div>
             <MiniGraph tasks={event.previewTasks} dependencies={event.previewDependencies} onTaskClick={(taskId) => navigate(`/events/${event.id}?task=${taskId}`)} />
-            <footer className="event-card-foot"><span>{event.completedTasks} / {event.totalTasks}</span><span className="progress"><i style={{ width: `${event.totalTasks ? (event.completedTasks / event.totalTasks) * 100 : 0}%` }} /></span><time>{formatDate(event.updatedAt)}</time></footer>
+            <footer className="event-card-foot"><span>最近更新</span><time>{formatDate(event.updatedAt)}</time></footer>
           </article>)}
         </div>
       </div>}

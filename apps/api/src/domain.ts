@@ -12,9 +12,12 @@ export function canTransition(from: TaskStatus, to: TaskStatus): boolean {
 }
 
 export function calculateEventStatus(tasks: Pick<Task, 'status'>[]): EventStatus {
-  if (tasks.length === 0 || tasks.every((task) => task.status === 'not_started')) return 'creating';
+  if (tasks.length === 0) return 'creating';
   if (tasks.every((task) => task.status === 'completed')) return 'completed';
-  return 'in_progress';
+  if (tasks.some((task) => task.status === 'in_progress')) return 'in_progress';
+  if (tasks.some((task) => task.status === 'paused')) return 'paused';
+  if (tasks.every((task) => task.status === 'not_started')) return 'ready';
+  return 'awaiting_progress';
 }
 
 export function getProgress(tasks: Pick<Task, 'status'>[]): { completedTasks: number; totalTasks: number } {
@@ -51,14 +54,14 @@ export function wouldCreateCycle(
 export function selectPreviewTaskIds(tasks: Task[], dependencies: Dependency[], limit = 8): Set<string> {
   if (tasks.length === 0) return new Set();
   const visibleIds = new Set(tasks.map((task) => task.id));
-  const running = tasks.filter((task) => task.status === 'in_progress');
+  const active = tasks.filter((task) => task.status === 'in_progress' || task.status === 'paused');
   const targets = new Set(dependencies.filter((edge) => visibleIds.has(edge.sourceTaskId) && visibleIds.has(edge.targetTaskId)).map((edge) => edge.sourceTaskId));
-  const focus = running.length > 0 ? running : tasks.filter((task) => !targets.has(task.id));
+  const focus = active.length > 0 ? active : tasks.filter((task) => !targets.has(task.id));
   const focusIds = new Set(focus.map((task) => task.id));
   const neighbors = new Set<string>();
   for (const edge of dependencies) {
     if (focusIds.has(edge.targetTaskId)) neighbors.add(edge.sourceTaskId);
-    if (running.length > 0 && focusIds.has(edge.sourceTaskId)) neighbors.add(edge.targetTaskId);
+    if (active.length > 0 && focusIds.has(edge.sourceTaskId)) neighbors.add(edge.targetTaskId);
   }
   const ordered = [...tasks].sort((a, b) => {
     const aRank = focusIds.has(a.id) ? 0 : neighbors.has(a.id) ? 1 : 2;

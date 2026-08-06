@@ -22,7 +22,7 @@ export function ActivePage() {
     onSuccess: async (event) => {
       await queryClient.invalidateQueries({ queryKey: ['events'] });
       setCreateOpen(false);
-      navigate(`/events/${event.id}`);
+      navigate(`/events/${event.id}`, { state: { returnTo: '/' } });
     }
   });
   async function createLabel(name: string) {
@@ -65,12 +65,12 @@ export function ActivePage() {
         <div className="snapshot-heading"><strong>SAGNEX · 活跃事件</strong><span>{new Date().toLocaleString('zh-CN')}</span></div>
         <div className="active-grid">
           {events.map((event) => <article className="event-card" key={event.id}>
-            <button className="event-card-open" type="button" aria-label={`打开${event.title}`} onClick={() => navigate(`/events/${event.id}`)} />
+            <button className="event-card-open" type="button" aria-label={`打开${event.title}`} onClick={() => navigate(`/events/${event.id}`, { state: { returnTo: '/' } })} />
             <div className="event-card-head">
               <div className="event-card-summary">
                 <h2>{event.title}</h2>
                 <p>{event.description || '暂无简介'}</p>
-                <EventTagSummary labels={event.labels} className="event-card-tags" onOpen={() => navigate(`/events/${event.id}`)} />
+                <EventTagSummary labels={event.labels} className="event-card-tags" onOpen={() => navigate(`/events/${event.id}`, { state: { returnTo: '/' } })} />
               </div>
               <div className="event-card-progress">
                 <span className={`status-badge status-${event.status}`}>{eventStatusText[event.status]}</span>
@@ -78,7 +78,7 @@ export function ActivePage() {
                 <span className="progress"><i style={{ width: `${event.totalTasks ? (event.completedTasks / event.totalTasks) * 100 : 0}%` }} /></span>
               </div>
             </div>
-            <MiniGraph tasks={event.previewTasks} dependencies={event.previewDependencies} onTaskClick={(taskId) => navigate(`/events/${event.id}?task=${taskId}`)} />
+            <MiniGraph tasks={event.previewTasks} dependencies={event.previewDependencies} onTaskClick={(taskId) => navigate(`/events/${event.id}?task=${taskId}`, { state: { returnTo: '/' } })} />
             <footer className="event-card-foot"><span>最近更新</span><time>{formatDate(event.updatedAt)}</time></footer>
           </article>)}
         </div>

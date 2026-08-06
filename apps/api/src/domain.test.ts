@@ -13,9 +13,11 @@ const dependency = (sourceTaskId: string, targetTaskId: string): Dependency => (
 describe('domain rules', () => {
   it('derives event status from tasks', () => {
     expect(calculateEventStatus([])).toBe('creating');
-    expect(calculateEventStatus([task('a', 'not_started')])).toBe('creating');
+    expect(calculateEventStatus([task('a', 'not_started')])).toBe('ready');
     expect(calculateEventStatus([task('a', 'completed'), task('b', 'completed')])).toBe('completed');
-    expect(calculateEventStatus([task('a', 'completed'), task('b', 'paused')])).toBe('in_progress');
+    expect(calculateEventStatus([task('a', 'paused'), task('b', 'in_progress')])).toBe('in_progress');
+    expect(calculateEventStatus([task('a', 'completed'), task('b', 'paused')])).toBe('paused');
+    expect(calculateEventStatus([task('a', 'completed'), task('b', 'not_started')])).toBe('awaiting_progress');
   });
 
   it('allows only explicit task transitions', () => {
@@ -37,5 +39,11 @@ describe('domain rules', () => {
     expect([...selectPreviewTaskIds(tasks, edges, 3)]).toEqual(expect.arrayContaining(['a', 'b', 'c']));
     const withoutRunning = tasks.map((item) => ({ ...item, status: item.id === 'a' ? 'completed' as const : 'not_started' as const }));
     expect([...selectPreviewTaskIds(withoutRunning, edges, 2)]).toEqual(expect.arrayContaining(['c', 'd']));
+  });
+
+  it('treats paused tasks as active preview focus', () => {
+    const tasks = [task('a', 'not_started'), task('b', 'paused'), task('c', 'not_started'), task('d', 'not_started')];
+    const dependencies = [dependency('a', 'b'), dependency('b', 'c')];
+    expect(selectPreviewTaskIds(tasks, dependencies, 3)).toEqual(new Set(['a', 'b', 'c']));
   });
 });

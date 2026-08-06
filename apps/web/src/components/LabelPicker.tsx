@@ -1,7 +1,7 @@
 import type { Label } from '@sagnex/contracts';
 import { Check, ChevronDown, Plus, Search, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { LabelIconView } from './LabelIcon';
+import { getLabelDisplayColor, LabelIconView } from './LabelIcon';
 
 interface LabelPickerProps {
   labels: Label[];
@@ -55,7 +55,7 @@ export function LabelPicker({ labels, selectedIds, onChange, onCreate, disabled,
     <div className={`label-picker-control ${open ? 'open' : ''} ${disabled ? 'disabled' : ''}`}>
       <div className="selected-labels">
         {selected.map((label) => <span className="label-chip" key={label.id}>
-          <span className="label-icon-mark" style={{ color: label.color }}><LabelIconView icon={label.icon} /></span><span className="label-chip-name">{label.name}</span>
+          <span className="label-icon-mark" style={{ color: getLabelDisplayColor(label) }}><LabelIconView icon={label.icon} /></span><span className="label-chip-name">{label.name}</span>
           {!disabled && <button type="button" aria-label={`移除标签 ${label.name}`} onClick={() => toggle(label.id)}><X /></button>}
         </span>)}
         {selected.length === 0 && <span className="label-placeholder">{placeholder}</span>}
@@ -68,7 +68,7 @@ export function LabelPicker({ labels, selectedIds, onChange, onCreate, disabled,
         {filtered.map((label) => {
           const checked = selectedIds.includes(label.id);
           return <button key={label.id} type="button" role="option" aria-selected={checked} className={checked ? 'label-option selected' : 'label-option'} onClick={() => toggle(label.id)}>
-            <span className="label-icon-mark" style={{ color: label.color }}><LabelIconView icon={label.icon} /></span><span className="label-option-name">{label.name}</span>{checked && <Check />}
+            <span className="label-icon-mark" style={{ color: getLabelDisplayColor(label) }}><LabelIconView icon={label.icon} /></span><span className="label-option-name">{label.name}</span>{checked && <Check />}
           </button>;
         })}
         {filtered.length === 0 && !query.trim() && <p className="label-empty">还没有标签</p>}

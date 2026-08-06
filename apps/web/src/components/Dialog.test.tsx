@@ -31,4 +31,9 @@ describe('Dialog', () => {
     render(<Dialog title="新建任务" onClose={() => undefined}><input aria-label="标题" autoFocus /></Dialog>);
     expect(screen.getByRole('textbox', { name: '标题' })).toHaveFocus();
   });
+
+  it('disables submission when the dialog content is invalid', () => {
+    render(<Dialog title="新建标签" onClose={() => undefined} onSubmit={(event) => event.preventDefault()} submitDisabled><p>内容</p></Dialog>);
+    expect(screen.getByRole('button', { name: '保存' })).toBeDisabled();
+  });
 });

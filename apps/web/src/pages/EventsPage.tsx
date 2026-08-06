@@ -29,7 +29,7 @@ export function EventsPage() {
     return haystack.includes(search.trim().toLocaleLowerCase());
   }), [allEvents, labelId, search, status]);
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['events'] });
-  const createEvent = useMutation({ mutationFn: api.createEvent, onSuccess: async (event) => { await refresh(); setCreateOpen(false); navigate(`/events/${event.id}`); } });
+  const createEvent = useMutation({ mutationFn: api.createEvent, onSuccess: async (event) => { await refresh(); setCreateOpen(false); navigate(`/events/${event.id}`, { state: { returnTo: '/events' } }); } });
   const archiveEvent = useMutation({ mutationFn: api.archiveEvent, onSuccess: refresh });
   const restoreEvent = useMutation({ mutationFn: api.restoreEvent, onSuccess: refresh });
   const deleteEvent = useMutation({ mutationFn: api.deleteEvent, onSuccess: async () => { setDeleteTarget(null); await refresh(); } });
@@ -44,12 +44,12 @@ export function EventsPage() {
     <div className="filter-bar">
       <label className="search-box"><Search /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索标题、简介或标签" /></label>
       <div className="segmented" aria-label="状态筛选">
-        {([['all','全部'],['creating','创建中'],['in_progress','进行中'],['completed','已完成'],['archived','已归档']] as const).map(([value, label]) => <button key={value} type="button" className={status === value ? 'selected' : ''} onClick={() => setStatus(value)}>{label}</button>)}
+        {([['all','全部'],['creating','创建中'],['ready','待开始'],['in_progress','进行中'],['paused','已暂停'],['awaiting_progress','待推进'],['completed','已完成'],['archived','已归档']] as const).map(([value, label]) => <button key={value} type="button" className={status === value ? 'selected' : ''} onClick={() => setStatus(value)}>{label}</button>)}
       </div>
       <div className="filter-label-picker"><LabelPicker labels={labels} selectedIds={labelId ? [labelId] : []} onChange={(ids) => setLabelId(ids.at(-1) ?? '')} ariaLabel="标签筛选" placeholder="全部标签" /></div>
     </div>
     {isLoading ? <div className="empty-state">正在加载...</div> : events.length === 0 ? <div className="empty-state">没有符合条件的事件</div> : <div className="event-tile-grid">
-      {events.map((event) => <article className="event-tile" key={event.id} tabIndex={0} onClick={() => navigate(`/events/${event.id}`)} onKeyDown={(keyEvent) => { if (keyEvent.key === 'Enter' && keyEvent.target === keyEvent.currentTarget) navigate(`/events/${event.id}`); }}>
+      {events.map((event) => <article className="event-tile" key={event.id} tabIndex={0} onClick={() => navigate(`/events/${event.id}`, { state: { returnTo: '/events' } })} onKeyDown={(keyEvent) => { if (keyEvent.key === 'Enter' && keyEvent.target === keyEvent.currentTarget) navigate(`/events/${event.id}`, { state: { returnTo: '/events' } }); }}>
         <header className="event-tile-head"><strong>{event.title}</strong><span className={`status-badge status-${event.status}`}>{eventStatusText[event.status]}</span></header>
         <p className="event-tile-description">{event.description || '暂无简介'}</p>
         <EventTagSummary labels={event.labels} className="event-tile-tags" />

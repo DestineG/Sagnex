@@ -1,4 +1,4 @@
-import type { LabelIcon } from '@sagnex/contracts';
+import type { Label, LabelIcon } from '@sagnex/contracts';
 import {
   BookOpen,
   BriefcaseBusiness,
@@ -48,6 +48,10 @@ export const labelIconOptions: Array<{ value: LabelIcon; label: string; icon: Lu
 ];
 
 const iconMap = Object.fromEntries(labelIconOptions.map((option) => [option.value, option.icon])) as Record<LabelIcon, LucideIcon>;
+
+export function getLabelDisplayColor(label: Pick<Label, 'color' | 'icon'>): string {
+  return label.icon.startsWith('emoji:') ? '#66736c' : label.color;
+}
 
 export function LabelIconView({ icon, className }: { icon: LabelIcon; className?: string }) {
   if (icon.startsWith('emoji:')) {

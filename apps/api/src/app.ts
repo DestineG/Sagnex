@@ -2,7 +2,9 @@ import {
   createDependencyInputSchema,
   createEventInputSchema,
   createLabelInputSchema,
+  createTaskCommentInputSchema,
   createTaskInputSchema,
+  eventStatusSchema,
   transitionInputSchema,
   updateEventInputSchema,
   updateLabelInputSchema,
@@ -61,7 +63,7 @@ export function createApp(context: DatabaseContext, options: { fetcher?: typeof 
   app.get('/api/events', async (request) => {
     const query = z.object({
       search: z.string().optional(),
-      status: z.enum(['creating', 'in_progress', 'completed']).optional(),
+      status: eventStatusSchema.optional(),
       labelId: z.string().uuid().optional(),
       archived: z.enum(['true', 'false']).optional(),
       active: z.enum(['true', 'false']).optional()
@@ -101,9 +103,18 @@ export function createApp(context: DatabaseContext, options: { fetcher?: typeof 
   app.post('/api/tasks/:taskId/transition', async (request) => {
     const { taskId } = taskIdParamsSchema.parse(request.params);
     const input = transitionInputSchema.parse(request.body);
-    return store.transitionTask(taskId, input.toStatus, input.confirmSoftDependencies);
+    return store.transitionTask(taskId, input.toStatus, input.confirmSoftDependencies, input.comment);
   });
   app.get('/api/tasks/:taskId/history', async (request) => store.getTaskHistory(taskIdParamsSchema.parse(request.params).taskId));
+  app.get('/api/tasks/:taskId/comments', async (request) => store.listTaskComments(taskIdParamsSchema.parse(request.params).taskId));
+  app.post('/api/tasks/:taskId/comments', async (request, reply) => {
+    const { taskId } = taskIdParamsSchema.parse(request.params);
+    return reply.status(201).send(await store.createTaskComment(taskId, createTaskCommentInputSchema.parse(request.body)));
+  });
+  app.delete('/api/task-comments/:id', async (request, reply) => {
+    await store.deleteTaskComment(idParamsSchema.parse(request.params).id);
+    return reply.status(204).send();
+  });
   app.patch('/api/events/:eventId/layout', async (request, reply) => {
     const { eventId } = eventIdParamsSchema.parse(request.params);
     await store.updateLayout(eventId, updateLayoutInputSchema.parse(request.body));

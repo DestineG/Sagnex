@@ -1,4 +1,4 @@
-import type { EventGraph, Label, StateChange, Task, TaskStatus } from '@sagnex/contracts';
+import type { EventGraph, Label, StateChange, Task, TaskComment, TaskStatus } from '@sagnex/contracts';
 import dagre from '@dagrejs/dagre';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -6,9 +6,9 @@ import {
   useEdgesState, useNodesState, useReactFlow, useViewport,
   type Connection, type Edge, type Node, type NodeProps
 } from '@xyflow/react';
-import { Archive, ArchiveRestore, ArrowLeft, Check, CheckCircle2, ChevronDown, Circle, CirclePlay, Download, FileJson, ImageDown, LayoutTemplate, Maximize2, Pause, PauseCircle, Play, Plus, Trash2 } from 'lucide-react';
+import { Archive, ArchiveRestore, ArrowLeft, Check, CheckCircle2, ChevronDown, Circle, CirclePlay, Download, FileJson, ImageDown, LayoutTemplate, Maximize2, Pause, PauseCircle, Play, Plus, Send, Trash2 } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type PointerEvent as ReactPointerEvent } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ApiError, api, downloadBlob, downloadJson, eventStatusText, exportStamp, formatDate, formatStatusDate, taskStatusText } from '../api';
 import { Dialog } from '../components/Dialog';
 import { graphPngBlob } from '../components/GraphSvg';
@@ -285,32 +285,42 @@ function EventInspector({ graph, labels, onUpdate }: { graph: EventGraph; labels
   </div>;
 }
 
-function TaskInspector({ graph, task, history, onUpdate, onTransition, onDelete }: {
+function TaskInspector({ graph, task, history, comments, onUpdate, onTransition, onCreateComment, onDeleteComment, onSelectTask, onDelete, transitionPending, commentPending }: {
   graph: EventGraph;
   task: Task;
   history: StateChange[];
+  comments: TaskComment[];
   onUpdate: (value: { title?: string; description?: string }) => void;
-  onTransition: (status: TaskStatus) => void;
+  onTransition: (status: TaskStatus, comment: string, onSuccess: () => void) => void;
+  onCreateComment: (content: string, onSuccess: () => void) => void;
+  onDeleteComment: (id: string) => void;
+  onSelectTask: (id: string) => void;
   onDelete: () => void;
+  transitionPending: boolean;
+  commentPending: boolean;
 }) {
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description);
+  const [statusComment, setStatusComment] = useState('');
+  const [comment, setComment] = useState('');
   useEffect(() => {
     if (graph.archivedAt || !title.trim() || (title === task.title && description === task.description)) return;
     const timer = window.setTimeout(() => onUpdate({ title: title.trim(), description }), 600);
     return () => window.clearTimeout(timer);
   }, [description, graph.archivedAt, onUpdate, task.description, task.status, task.title, title]);
   const incoming = graph.dependencies.filter((edge) => edge.targetTaskId === task.id).map((edge) => graph.tasks.find((candidate) => candidate.id === edge.sourceTaskId)).filter(Boolean) as Task[];
+  const transitionTo = (status: TaskStatus) => onTransition(status, statusComment, () => setStatusComment(''));
   return <div className="inspector-content">
-    <section><p className="inspector-label">任务</p><label className="field compact"><span>标题</span><input value={title} onChange={(event) => setTitle(event.target.value)} disabled={Boolean(graph.archivedAt)} /></label><label className="field compact"><span>简介</span><textarea rows={4} value={description} onChange={(event) => setDescription(event.target.value)} disabled={Boolean(graph.archivedAt)} /></label></section>
-    <section><p className="inspector-label">状态</p><strong>{taskStatusText[task.status]}</strong>{!graph.archivedAt && <div className="task-actions">
-      {task.status === 'not_started' && <button className="button primary" onClick={() => onTransition('in_progress')}><Play />开始</button>}
-      {task.status === 'in_progress' && <><button className="button" onClick={() => onTransition('paused')}><Pause />暂停</button><button className="button primary" onClick={() => onTransition('completed')}><Check />完成</button></>}
-      {task.status === 'paused' && <><button className="button" onClick={() => onTransition('in_progress')}><Play />继续</button><button className="button primary" onClick={() => onTransition('completed')}><Check />完成</button></>}
-      {task.status === 'completed' && <button className="button" onClick={() => onTransition('in_progress')}><Play />重新打开</button>}
-    </div>}</section>
-    <section><p className="inspector-label">前置任务</p>{incoming.length ? <div className="dependency-list">{incoming.map((item) => <span key={item.id}>{item.title}<i>{taskStatusText[item.status]}</i></span>)}</div> : <p className="muted">无</p>}</section>
-    <section><p className="inspector-label">状态历史</p>{history.length ? <div className="history-list">{history.map((change) => <div key={change.id}><i /><span>{taskStatusText[change.fromStatus]} → {taskStatusText[change.toStatus]}<time>{formatDate(change.changedAt)}</time></span></div>)}</div> : <p className="muted">尚无状态变化</p>}</section>
+    <section><p className="inspector-label">任务信息</p><label className="field compact"><span>标题</span><input value={title} onChange={(event) => setTitle(event.target.value)} disabled={Boolean(graph.archivedAt)} /></label><label className="field compact"><span>简介</span><textarea rows={4} value={description} onChange={(event) => setDescription(event.target.value)} disabled={Boolean(graph.archivedAt)} /></label><div className="field compact"><span>前置任务</span>{incoming.length ? <div className="dependency-list">{incoming.map((item) => <button type="button" key={item.id} onClick={() => onSelectTask(item.id)}>{item.title}<i>{taskStatusText[item.status]}</i></button>)}</div> : <p className="muted">无</p>}</div></section>
+    <section><p className="inspector-label">状态</p><strong>{taskStatusText[task.status]}</strong>{!graph.archivedAt && <><label className="field compact status-comment"><span>本次状态备注（可选）</span><textarea rows={2} maxLength={500} value={statusComment} onChange={(event) => setStatusComment(event.target.value)} /></label><div className="task-actions">
+      {task.status === 'not_started' && <button className="button primary" disabled={transitionPending} onClick={() => transitionTo('in_progress')}><Play />开始</button>}
+      {task.status === 'in_progress' && <><button className="button" disabled={transitionPending} onClick={() => transitionTo('paused')}><Pause />暂停</button><button className="button primary" disabled={transitionPending} onClick={() => transitionTo('completed')}><Check />完成</button></>}
+      {task.status === 'paused' && <><button className="button" disabled={transitionPending} onClick={() => transitionTo('in_progress')}><Play />继续</button><button className="button primary" disabled={transitionPending} onClick={() => transitionTo('completed')}><Check />完成</button></>}
+      {task.status === 'completed' && <button className="button" disabled={transitionPending} onClick={() => transitionTo('in_progress')}><Play />重新打开</button>}
+    </div></>}
+    </section>
+    <section><p className="inspector-label">任务评论</p>{!graph.archivedAt && <form className="comment-compose" onSubmit={(event) => { event.preventDefault(); if (comment.trim()) onCreateComment(comment.trim(), () => setComment('')); }}><textarea aria-label="任务评论" rows={2} maxLength={1000} value={comment} onChange={(event) => setComment(event.target.value)} placeholder="记录补充信息" /><button className="icon-button primary-icon" type="submit" disabled={!comment.trim() || commentPending} aria-label="提交评论" data-tooltip="提交评论"><Send /></button></form>}{comments.length ? <div className="comment-list">{comments.map((item) => <article key={item.id}><p>{item.content}</p><footer><time>{formatDate(item.createdAt)}</time>{!graph.archivedAt && <button className="icon-button danger" type="button" aria-label="删除评论" data-tooltip="删除评论" onClick={() => onDeleteComment(item.id)}><Trash2 /></button>}</footer></article>)}</div> : <p className="muted">暂无评论</p>}</section>
+    <section><p className="inspector-label">状态历史</p>{history.length ? <div className="history-list">{history.map((change) => <div key={change.id}><i /><span>{taskStatusText[change.fromStatus]} → {taskStatusText[change.toStatus]}{change.comment && <em>{change.comment}</em>}<time>{formatDate(change.changedAt)}</time></span></div>)}</div> : <p className="muted">尚无状态变化</p>}</section>
     {!graph.archivedAt && <section><button className="button danger-text" onClick={onDelete}><Trash2 />删除任务</button></section>}
   </div>;
 }
@@ -352,16 +362,19 @@ function Editor({ graph, labels, onExportJson, onArchive, onRestoreEvent }: { gr
 
   const selectedTask = graph.tasks.find((task) => task.id === selectedTaskId);
   const { data: history = [] } = useQuery({ queryKey: ['task-history', selectedTaskId], queryFn: () => api.getTaskHistory(selectedTaskId!), enabled: Boolean(selectedTaskId) });
+  const { data: comments = [] } = useQuery({ queryKey: ['task-comments', selectedTaskId], queryFn: () => api.listTaskComments(selectedTaskId!), enabled: Boolean(selectedTaskId) });
   const createTask = useMutation({ mutationFn: (value: { title: string; description: string }) => api.createTask(graph.id, { ...value, positionX: 80 + (graph.tasks.length % 4) * 233, positionY: 100 + Math.floor(graph.tasks.length / 4) * 138 }), onSuccess: async (task) => { setTaskDialog(false); await refresh(); setSearchParams({ task: task.id }); } });
   const updateEvent = useMutation({ mutationFn: (value: { title?: string; description?: string; labelIds?: string[] }) => api.updateEvent(graph.id, value), onSuccess: refresh, onError: (cause) => setError(cause.message) });
   const updateTask = useMutation({ mutationFn: ({ id, value }: { id: string; value: { title?: string; description?: string } }) => api.updateTask(id, value), onSuccess: refresh, onError: (cause) => setError(cause.message) });
-  const transition = useMutation({ mutationFn: ({ id, status, confirmed = false }: { id: string; status: TaskStatus; confirmed?: boolean }) => api.transitionTask(id, status, confirmed), onSuccess: async () => { await refresh(); if (selectedTaskId) await queryClient.invalidateQueries({ queryKey: ['task-history', selectedTaskId] }); }, onError: async (cause, variables) => {
+  const transition = useMutation({ mutationFn: ({ id, status, confirmed = false, comment }: { id: string; status: TaskStatus; confirmed?: boolean; comment: string; afterSuccess: () => void }) => api.transitionTask(id, status, confirmed, comment), onSuccess: async (_result, variables) => { variables.afterSuccess(); await refresh(); if (selectedTaskId) await queryClient.invalidateQueries({ queryKey: ['task-history', selectedTaskId] }); }, onError: async (cause, variables) => {
     if (cause instanceof ApiError && cause.details?.code === 'SOFT_DEPENDENCY_CONFIRMATION') {
       const names = cause.details.tasks.map((task: Task) => task.title).join('、');
       if (window.confirm(`前置任务“${names}”尚未完成，仍要开始吗？`)) transition.mutate({ ...variables, confirmed: true });
     } else setError(cause.message);
   } });
-  const removeTask = useMutation({ mutationFn: api.deleteTask, onSuccess: async (_result, taskId) => { await queryClient.invalidateQueries({ queryKey: ['task-history', taskId] }); setSearchParams({}); await refresh(); }, onError: (cause) => setError(cause.message) });
+  const createComment = useMutation({ mutationFn: ({ taskId, content }: { taskId: string; content: string; afterSuccess: () => void }) => api.createTaskComment(taskId, content), onSuccess: async (_result, variables) => { variables.afterSuccess(); await queryClient.invalidateQueries({ queryKey: ['task-comments', variables.taskId] }); await refresh(); }, onError: (cause) => setError(cause.message) });
+  const removeComment = useMutation({ mutationFn: api.deleteTaskComment, onSuccess: async () => { if (selectedTaskId) await queryClient.invalidateQueries({ queryKey: ['task-comments', selectedTaskId] }); await refresh(); }, onError: (cause) => setError(cause.message) });
+  const removeTask = useMutation({ mutationFn: api.deleteTask, onSuccess: async (_result, taskId) => { await queryClient.invalidateQueries({ queryKey: ['task-history', taskId] }); await queryClient.invalidateQueries({ queryKey: ['task-comments', taskId] }); setSearchParams({}); await refresh(); }, onError: (cause) => setError(cause.message) });
   const createDependency = useMutation({ mutationFn: (connection: Connection) => api.createDependency(graph.id, { sourceTaskId: connection.source!, targetTaskId: connection.target! }), onSuccess: refresh, onError: (cause) => setError(cause.message) });
   const deleteDependency = useMutation({ mutationFn: api.deleteDependency, onSuccess: refresh, onError: (cause) => setError(cause.message) });
 
@@ -445,7 +458,7 @@ function Editor({ graph, labels, onExportJson, onArchive, onRestoreEvent }: { gr
       </div>
     </div>
     <aside className="inspector">
-      {selectedTask ? <TaskInspector key={selectedTask.id} graph={graph} task={selectedTask} history={history} onUpdate={(value) => updateTask.mutate({ id: selectedTask.id, value })} onTransition={(status) => transition.mutate({ id: selectedTask.id, status })} onDelete={() => { if (window.confirm('永久删除这个任务？任务历史和相关依赖也会一并删除。')) removeTask.mutate(selectedTask.id); }} /> : <EventInspector key={graph.id} graph={graph} labels={labels} onUpdate={(value) => updateEvent.mutate(value)} />}
+      {selectedTask ? <TaskInspector key={selectedTask.id} graph={graph} task={selectedTask} history={history} comments={comments} onUpdate={(value) => updateTask.mutate({ id: selectedTask.id, value })} onTransition={(status, comment, afterSuccess) => transition.mutate({ id: selectedTask.id, status, comment, afterSuccess })} onCreateComment={(content, afterSuccess) => createComment.mutate({ taskId: selectedTask.id, content, afterSuccess })} onDeleteComment={(id) => { if (window.confirm('删除这条任务评论？')) removeComment.mutate(id); }} onSelectTask={(id) => setSearchParams({ task: id })} transitionPending={transition.isPending} commentPending={createComment.isPending} onDelete={() => { if (window.confirm('永久删除这个任务？任务历史、评论和相关依赖也会一并删除。')) removeTask.mutate(selectedTask.id); }} /> : <EventInspector key={graph.id} graph={graph} labels={labels} onUpdate={(value) => updateEvent.mutate(value)} />}
     </aside>
     {taskDialog && <TaskDialog onClose={() => setTaskDialog(false)} onCreate={(value) => createTask.mutateAsync(value).then(() => undefined)} />}
     <div className="sr-only" aria-live="polite">{updateEvent.isPending || updateTask.isPending ? '正在保存' : '已保存'}</div>
@@ -456,6 +469,9 @@ function Editor({ graph, labels, onExportJson, onArchive, onRestoreEvent }: { gr
 export function EventEditorPage() {
   const { eventId = '' } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [returnTo] = useState<'/' | '/events'>(() => location.state && typeof location.state === 'object' && 'returnTo' in location.state && location.state.returnTo === '/' ? '/' : '/events');
+  const returnLabel = returnTo === '/' ? '返回活跃事件' : '返回事件列表';
   const queryClient = useQueryClient();
   const { data: graph, isLoading, error } = useQuery({ queryKey: ['event', eventId], queryFn: () => api.getEvent(eventId), enabled: Boolean(eventId) });
   const { data: labels = [] } = useQuery({ queryKey: ['labels'], queryFn: api.listLabels });
@@ -467,7 +483,7 @@ export function EventEditorPage() {
   if (error || !graph) return <div className="empty-state"><h2>无法打开事件</h2><p>{error?.message}</p><button className="button" onClick={() => navigate('/events')}>返回事件列表</button></div>;
   return <section className="editor-page">
     <header className="editor-head">
-      <button className="icon-button" onClick={() => navigate('/')} aria-label="返回活跃事件" data-tooltip="返回活跃事件"><ArrowLeft /></button>
+      <button className="icon-button" onClick={() => navigate(returnTo)} aria-label={returnLabel} data-tooltip={returnLabel}><ArrowLeft /></button>
       <div className="editor-heading"><h1>{graph.title}</h1><p>{graph.labels.map((label) => label.name).join(' · ') || '未分类'}</p></div>
       <span className={`status-badge status-${graph.status}`}>{eventStatusText[graph.status]}</span>
       <span className="save-state">自动保存</span>

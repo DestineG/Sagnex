@@ -47,6 +47,10 @@ describe('SagnexStore', () => {
     await store.transitionTask(completedTask.id, 'in_progress', false);
     await store.transitionTask(completedTask.id, 'completed', false);
 
+    expect((await store.getEvent(creating.id)).status).toBe('ready');
+    expect((await store.getEvent(running.id)).status).toBe('in_progress');
+    expect((await store.getEvent(paused.id)).status).toBe('paused');
+    expect((await store.getEvent(betweenSteps.id)).status).toBe('awaiting_progress');
     await store.setArchived(running.id, true);
     expect((await store.listEvents({ active: true })).map((event) => event.title)).toEqual(['已暂停']);
   });
@@ -132,5 +136,35 @@ describe('SagnexStore', () => {
     await new Promise((resolve) => setTimeout(resolve, 2));
     const transitioned = await store.transitionTask(task.id, 'in_progress', false);
     expect(transitioned.task.statusChangedAt >= task.statusChangedAt).toBe(true);
+  });
+
+  it('stores immutable status comments and deletable task comments', async () => {
+    const event = await store.createEvent({ title: '记录', description: '', labelIds: [] });
+    const task = await store.createTask(event.id, { title: '任务', description: '', positionX: 0, positionY: 0 });
+    await store.transitionTask(task.id, 'in_progress', false, '开始处理');
+    expect(await store.getTaskHistory(task.id)).toEqual([
+      expect.objectContaining({ fromStatus: 'not_started', toStatus: 'in_progress', comment: '开始处理' })
+    ]);
+
+    const comment = await store.createTaskComment(task.id, { content: '单独记录一条评论' });
+    expect(await store.listTaskComments(task.id)).toEqual([comment]);
+    await store.deleteTaskComment(comment.id);
+    expect(await store.listTaskComments(task.id)).toEqual([]);
+    const archivedComment = await store.createTaskComment(task.id, { content: '归档前评论' });
+    await store.setArchived(event.id, true);
+    await expect(store.createTaskComment(task.id, { content: '归档后评论' })).rejects.toMatchObject({ statusCode: 409 });
+    await expect(store.deleteTaskComment(archivedComment.id)).rejects.toMatchObject({ statusCode: 409 });
+  });
+
+  it('includes comments and status notes in backup round trips', async () => {
+    const event = await store.createEvent({ title: '备份评论', description: '', labelIds: [] });
+    const task = await store.createTask(event.id, { title: '任务', description: '', positionX: 0, positionY: 0 });
+    await store.transitionTask(task.id, 'in_progress', false, '状态备注');
+    await store.createTaskComment(task.id, { content: '任务评论' });
+    const backup = await store.exportBackup();
+    expect(backup.schemaVersion).toBe(3);
+    await store.importBackup(backup);
+    expect((await store.getTaskHistory(task.id))[0]?.comment).toBe('状态备注');
+    expect((await store.listTaskComments(task.id))[0]?.content).toBe('任务评论');
   });
 });

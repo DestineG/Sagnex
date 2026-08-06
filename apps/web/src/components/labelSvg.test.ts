@@ -22,6 +22,19 @@ describe('normalizeLabelSvg', () => {
     expect(result).not.toContain('script');
   });
 
+  it('maps the root paint to the selected label color', () => {
+    const result = normalizeLabelSvg('<svg viewBox="0 0 24 24" fill="none" stroke="#607d8b"><path d="M1 1h20" /></svg>');
+    expect(result).toContain('stroke="currentColor"');
+    expect(result).toContain('fill="none"');
+    expect(result).not.toContain('#607d8b');
+  });
+
+  it('maps only the dominant child paint and preserves accent colors', () => {
+    const result = normalizeLabelSvg('<svg viewBox="0 0 24 24"><path fill="#333" d="M0 0h4v4z"/><path fill="#333" d="M5 0h4v4z"/><circle fill="#f00" cx="12" cy="12" r="2"/></svg>');
+    expect(result.match(/fill="currentColor"/g)).toHaveLength(2);
+    expect(result).toContain('fill="#f00"');
+  });
+
   it('rejects content without an SVG root', () => {
     expect(() => normalizeLabelSvg('<div>not an icon</div>')).toThrow('请粘贴完整的 SVG 标签');
   });

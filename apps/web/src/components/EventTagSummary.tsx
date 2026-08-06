@@ -1,6 +1,6 @@
 import type { Label } from '@sagnex/contracts';
 import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { LabelIconView } from './LabelIcon';
+import { getLabelDisplayColor, LabelIconView } from './LabelIcon';
 
 const TAG_GAP = 6;
 
@@ -46,7 +46,7 @@ function TagChip({ label, measure = false }: { label: Label; measure?: boolean }
     className="tag label-tag"
     title={measure ? undefined : label.name}
     data-tag-measure={measure ? '' : undefined}
-    style={{ '--label-color': label.color } as CSSProperties}
+    style={{ '--label-color': getLabelDisplayColor(label) } as CSSProperties}
   >
     <span className="label-tag-icon"><LabelIconView icon={label.icon} /></span>
     <span className="tag-name">{label.name}</span>

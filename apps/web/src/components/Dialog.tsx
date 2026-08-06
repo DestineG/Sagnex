@@ -9,9 +9,10 @@ interface DialogProps {
   submitLabel?: string;
   destructive?: boolean;
   busy?: boolean;
+  submitDisabled?: boolean;
 }
 
-export function Dialog({ title, children, onClose, onSubmit, submitLabel = '保存', destructive, busy }: DialogProps) {
+export function Dialog({ title, children, onClose, onSubmit, submitLabel = '保存', destructive, busy, submitDisabled }: DialogProps) {
   const titleId = useId();
   const formRef = useRef<HTMLFormElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
@@ -66,7 +67,7 @@ export function Dialog({ title, children, onClose, onSubmit, submitLabel = '保�
     <>
       <header className="dialog-head"><h2 id={titleId}>{title}</h2><button className="icon-button" type="button" onClick={onClose} disabled={busy} aria-label="关闭" data-tooltip="关闭"><X /></button></header>
       <div className="dialog-body">{children}</div>
-      {onSubmit && <footer className="dialog-actions"><button className="button" type="button" onClick={onClose} disabled={busy}>取消</button><button className={destructive ? 'button destructive' : 'button primary'} type="submit" disabled={busy}>{busy ? '处理中...' : submitLabel}</button></footer>}
+      {onSubmit && <footer className="dialog-actions"><button className="button" type="button" onClick={onClose} disabled={busy}>取消</button><button className={destructive ? 'button destructive' : 'button primary'} type="submit" disabled={busy || submitDisabled}>{busy ? '处理中...' : submitLabel}</button></footer>}
     </>
   );
   return <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && !busy && onClose()}>

@@ -49,7 +49,15 @@ export const stateChanges = sqliteTable('task_state_changes', {
   taskId: text('task_id').notNull().references(() => tasks.id, { onDelete: 'cascade' }),
   fromStatus: text('from_status', { enum: ['not_started', 'in_progress', 'paused', 'completed'] }).notNull(),
   toStatus: text('to_status', { enum: ['not_started', 'in_progress', 'paused', 'completed'] }).notNull(),
+  comment: text('comment'),
   changedAt: text('changed_at').notNull()
+});
+
+export const taskComments = sqliteTable('task_comments', {
+  id: text('id').primaryKey(),
+  taskId: text('task_id').notNull().references(() => tasks.id, { onDelete: 'cascade' }),
+  content: text('content').notNull(),
+  createdAt: text('created_at').notNull()
 });
 
 export const webdavSettings = sqliteTable('webdav_settings', {

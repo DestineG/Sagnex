@@ -4,6 +4,7 @@ import {
   type CreateDependencyInput,
   type CreateEventInput,
   type CreateLabelInput,
+  type CreateTaskCommentInput,
   type CreateTaskInput,
   type Dependency,
   type EventGraph,
@@ -12,6 +13,7 @@ import {
   type Label,
   type StateChange,
   type Task,
+  type TaskComment,
   type TaskStatus,
   type UpdateEventInput,
   type UpdateLabelInput,
@@ -24,7 +26,7 @@ import { dirname, join } from 'node:path';
 import type { DatabaseContext } from './database.js';
 import { calculateEventStatus, canTransition, getProgress, selectPreviewTaskIds, wouldCreateCycle } from './domain.js';
 import { InvalidLabelIconError, sanitizeLabelIcon } from './label-icon.js';
-import { dependencies, eventLabels, events, labels, stateChanges, tasks } from './schema.js';
+import { dependencies, eventLabels, events, labels, stateChanges, taskComments, tasks } from './schema.js';
 
 export class StoreError extends Error {
   constructor(public readonly statusCode: number, message: string, public readonly details?: unknown) {
@@ -265,7 +267,7 @@ export class SagnexStore {
     });
   }
 
-  async transitionTask(taskId: string, toStatus: TaskStatus, confirmSoftDependencies: boolean): Promise<{ task: Task; unmetDependencies: Task[] }> {
+  async transitionTask(taskId: string, toStatus: TaskStatus, confirmSoftDependencies: boolean, comment = ''): Promise<{ task: Task; unmetDependencies: Task[] }> {
     const task = await this.requireTask(taskId);
     await this.requireEditableEvent(task.eventId);
     if (!canTransition(task.status, toStatus)) throw new StoreError(409, `不能从 ${task.status} 切换到 ${toStatus}`);
@@ -276,7 +278,7 @@ export class SagnexStore {
     const timestamp = now();
     this.context.db.transaction((tx) => {
       tx.update(tasks).set({ status: toStatus, updatedAt: timestamp, statusChangedAt: timestamp }).where(eq(tasks.id, taskId)).run();
-      tx.insert(stateChanges).values({ id: crypto.randomUUID(), taskId, fromStatus: task.status, toStatus, changedAt: timestamp }).run();
+      tx.insert(stateChanges).values({ id: crypto.randomUUID(), taskId, fromStatus: task.status, toStatus, comment: comment.trim() || null, changedAt: timestamp }).run();
       tx.update(events).set({ updatedAt: timestamp }).where(eq(events.id, task.eventId)).run();
     });
     return { task: await this.requireTask(taskId), unmetDependencies };
@@ -285,6 +287,34 @@ export class SagnexStore {
   async getTaskHistory(taskId: string): Promise<StateChange[]> {
     await this.requireTask(taskId);
     return this.context.db.select().from(stateChanges).where(eq(stateChanges.taskId, taskId)).orderBy(desc(stateChanges.changedAt)) as Promise<StateChange[]>;
+  }
+
+  async listTaskComments(taskId: string): Promise<TaskComment[]> {
+    await this.requireTask(taskId);
+    return this.context.db.select().from(taskComments).where(eq(taskComments.taskId, taskId)).orderBy(desc(taskComments.createdAt)) as Promise<TaskComment[]>;
+  }
+
+  async createTaskComment(taskId: string, input: CreateTaskCommentInput): Promise<TaskComment> {
+    const task = await this.requireTask(taskId);
+    await this.requireEditableEvent(task.eventId);
+    const row: TaskComment = { id: crypto.randomUUID(), taskId, content: input.content, createdAt: now() };
+    this.context.db.transaction((tx) => {
+      tx.insert(taskComments).values(row).run();
+      tx.update(events).set({ updatedAt: row.createdAt }).where(eq(events.id, task.eventId)).run();
+    });
+    return row;
+  }
+
+  async deleteTaskComment(id: string): Promise<void> {
+    const [comment] = await this.context.db.select().from(taskComments).where(eq(taskComments.id, id)).limit(1);
+    if (!comment) throw new StoreError(404, '任务评论不存在');
+    const task = await this.requireTask(comment.taskId);
+    await this.requireEditableEvent(task.eventId);
+    const timestamp = now();
+    this.context.db.transaction((tx) => {
+      tx.delete(taskComments).where(eq(taskComments.id, id)).run();
+      tx.update(events).set({ updatedAt: timestamp }).where(eq(events.id, task.eventId)).run();
+    });
   }
 
   async createDependency(eventId: string, input: CreateDependencyInput): Promise<Dependency> {
@@ -315,19 +345,21 @@ export class SagnexStore {
   }
 
   async exportBackup(): Promise<BackupEnvelope> {
-    const [labelRows, eventRows, joinRows, taskRows, dependencyRows, changeRows] = await Promise.all([
+    const [labelRows, eventRows, joinRows, taskRows, dependencyRows, changeRows, commentRows] = await Promise.all([
       this.context.db.select().from(labels), this.context.db.select().from(events), this.context.db.select().from(eventLabels),
-      this.context.db.select().from(tasks), this.context.db.select().from(dependencies), this.context.db.select().from(stateChanges)
+      this.context.db.select().from(tasks), this.context.db.select().from(dependencies), this.context.db.select().from(stateChanges),
+      this.context.db.select().from(taskComments)
     ]);
     return {
-      schemaVersion: 2,
+      schemaVersion: 3,
       exportedAt: now(),
       labels: labelRows.map((label) => ({ id: label.id, name: label.name, color: label.color, icon: label.icon, createdAt: label.createdAt })),
       events: eventRows,
       eventLabels: joinRows,
       tasks: taskRows as Task[],
       dependencies: dependencyRows as Dependency[],
-      stateChanges: changeRows as StateChange[]
+      stateChanges: changeRows as StateChange[],
+      taskComments: commentRows as TaskComment[]
     };
   }
 
@@ -346,7 +378,8 @@ export class SagnexStore {
       eventLabels: joins,
       tasks: eventTasks,
       dependencies: all.dependencies.filter((edge) => edge.eventId === eventId),
-      stateChanges: all.stateChanges.filter((change) => taskIds.has(change.taskId))
+      stateChanges: all.stateChanges.filter((change) => taskIds.has(change.taskId)),
+      taskComments: all.taskComments.filter((comment) => taskIds.has(comment.taskId))
     };
   }
 
@@ -372,13 +405,15 @@ export class SagnexStore {
       const insertJoin = this.context.raw.prepare('INSERT INTO event_labels (event_id,label_id) VALUES (?,?)');
       const insertTask = this.context.raw.prepare('INSERT INTO tasks (id,event_id,title,description,status,position_x,position_y,created_at,updated_at,status_changed_at) VALUES (?,?,?,?,?,?,?,?,?,?)');
       const insertDependency = this.context.raw.prepare('INSERT INTO dependencies (id,event_id,source_task_id,target_task_id,created_at) VALUES (?,?,?,?,?)');
-      const insertChange = this.context.raw.prepare('INSERT INTO task_state_changes (id,task_id,from_status,to_status,changed_at) VALUES (?,?,?,?,?)');
+      const insertChange = this.context.raw.prepare('INSERT INTO task_state_changes (id,task_id,from_status,to_status,comment,changed_at) VALUES (?,?,?,?,?,?)');
+      const insertComment = this.context.raw.prepare('INSERT INTO task_comments (id,task_id,content,created_at) VALUES (?,?,?,?)');
       for (const label of backup.labels) insertLabel.run(label.id, label.name, normalizeLabel(label.name), label.color, label.icon, label.createdAt);
       for (const event of backup.events) insertEvent.run(event.id, event.title, event.description, event.archivedAt, event.createdAt, event.updatedAt);
       for (const joinRow of backup.eventLabels) insertJoin.run(joinRow.eventId, joinRow.labelId);
       for (const task of backup.tasks) insertTask.run(task.id, task.eventId, task.title, task.description, task.status, task.positionX, task.positionY, task.createdAt, task.updatedAt, task.statusChangedAt);
       for (const edge of backup.dependencies) insertDependency.run(edge.id, edge.eventId, edge.sourceTaskId, edge.targetTaskId, edge.createdAt);
-      for (const change of backup.stateChanges) insertChange.run(change.id, change.taskId, change.fromStatus, change.toStatus, change.changedAt);
+      for (const change of backup.stateChanges) insertChange.run(change.id, change.taskId, change.fromStatus, change.toStatus, change.comment, change.changedAt);
+      for (const comment of backup.taskComments) insertComment.run(comment.id, comment.taskId, comment.content, comment.createdAt);
     });
     replace();
     return { backupPath };
@@ -400,6 +435,7 @@ export class SagnexStore {
     if (backup.eventLabels.some((joinRow) => !eventIds.has(joinRow.eventId) || !labelIds.has(joinRow.labelId))) throw new StoreError(400, '备份中存在无效标签引用');
     if (backup.dependencies.some((edge) => !eventIds.has(edge.eventId) || !taskIds.has(edge.sourceTaskId) || !taskIds.has(edge.targetTaskId))) throw new StoreError(400, '备份中存在无效依赖引用');
     if (backup.stateChanges.some((change) => !taskIds.has(change.taskId))) throw new StoreError(400, '备份中存在无效历史引用');
+    if (backup.taskComments.some((comment) => !taskIds.has(comment.taskId))) throw new StoreError(400, '备份中存在无效评论引用');
   }
 
   private async requireEvent(id: string): Promise<typeof events.$inferSelect> {

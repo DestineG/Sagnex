@@ -9,9 +9,12 @@ test('completes the local event workflow', async ({ page, request }) => {
   await page.goto('/labels');
   await page.getByRole('button', { name: '新建标签' }).first().click();
   await page.getByLabel('名称').fill(labelName);
-  await page.getByLabel('自定义颜色').fill('#4b62a8');
-  await page.getByRole('tab', { name: 'SVG' }).click();
+  await page.getByRole('tab', { name: 'SVG 图标' }).click();
+  await page.getByRole('button', { name: '自定义 SVG' }).click();
   await page.getByLabel('SVG 标签').fill('<!-- tags: [test] --><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 3h18v18H3z" /></svg>');
+  await page.getByLabel('自定义颜色').fill('#4b62a8');
+  await expect(page.locator('.preview-tag')).toContainText(labelName);
+  await expect(page.locator('.preview-tag svg')).toHaveAttribute('fill', 'currentColor');
   await page.getByRole('button', { name: '保存' }).click();
   await expect(page.getByText(labelName)).toBeVisible();
   await expect(page.locator('.label-row').filter({ hasText: labelName }).locator('.label-name > i')).toHaveCount(0);
@@ -25,6 +28,9 @@ test('completes the local event workflow', async ({ page, request }) => {
   await page.getByRole('button', { name: '创建并规划' }).click();
   await expect(page).toHaveURL(/\/events\/[0-9a-f-]+$/);
   const eventId = page.url().split('/events/')[1]!;
+  await page.getByRole('button', { name: '返回事件列表' }).click();
+  await expect(page).toHaveURL(/\/events$/);
+  await page.locator('.event-tile').filter({ hasText: eventTitle }).click();
 
   await page.getByRole('button', { name: '任务', exact: true }).click();
   await page.getByPlaceholder('任务名称').fill('前置任务');
@@ -44,8 +50,16 @@ test('completes the local event workflow', async ({ page, request }) => {
   await page.reload();
 
   page.once('dialog', (dialog) => dialog.accept());
-  await page.getByRole('button', { name: '开始' }).click();
+  await page.getByLabel('本次状态备注（可选）').fill('开始处理后续任务');
+  await page.getByRole('button', { name: '开始', exact: true }).click();
   await expect(page.getByText('未开始 → 进行中')).toBeVisible();
+  await expect(page.getByText('开始处理后续任务')).toBeVisible();
+  await page.getByLabel('任务评论').fill('这是一条独立评论');
+  await page.getByRole('button', { name: '提交评论' }).click();
+  await expect(page.getByText('这是一条独立评论')).toBeVisible();
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: '删除评论' }).click();
+  await expect(page.getByText('这是一条独立评论')).toHaveCount(0);
   await expect(page.locator('.canvas-minimap')).toBeVisible();
 
   await page.getByRole('button', { name: '任务', exact: true }).click();
@@ -53,7 +67,7 @@ test('completes the local event workflow', async ({ page, request }) => {
   await page.getByRole('button', { name: '添加到画布' }).click();
   const disposableGraph = await (await request.get(`/api/events/${eventId}`)).json();
   const disposable = disposableGraph.tasks.find((task: { title: string }) => task.title === '待删除任务');
-  await page.getByRole('button', { name: '开始' }).click();
+  await page.getByRole('button', { name: '开始', exact: true }).click();
   await expect(page.getByText('未开始 → 进行中')).toBeVisible();
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: '删除任务' }).click();
@@ -83,6 +97,9 @@ test('completes the local event workflow', async ({ page, request }) => {
   await activeCard.getByRole('button', { name: '后续任务，进行中' }).click();
   await expect(page).toHaveURL(new RegExp(`task=${target.id}`));
   await expect(page.locator('.inspector input').first()).toHaveValue('后续任务');
+  await page.getByRole('button', { name: '返回活跃事件' }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await activeCard.getByRole('button', { name: '后续任务，进行中' }).click();
   const archiveResponse = page.waitForResponse((response) => response.url().endsWith(`/api/events/${eventId}/archive`));
   await page.getByRole('button', { name: '归档事件' }).click();
   const archived = await archiveResponse;
@@ -99,6 +116,11 @@ test('completes the local event workflow', async ({ page, request }) => {
 
   await page.getByRole('link', { name: '标签' }).click();
   const labelRow = page.locator('.label-row').filter({ hasText: labelName });
+  await labelRow.getByRole('button', { name: `编辑${labelName}` }).click();
+  await page.getByRole('tab', { name: 'Emoji' }).click();
+  await page.getByRole('button', { name: '选择 Emoji 学习' }).click();
+  await expect(page.locator('.preview-tag')).toContainText(labelName);
+  await page.getByRole('button', { name: '保存' }).click();
   await labelRow.getByRole('button', { name: `删除${labelName}` }).click();
   await page.getByRole('button', { name: '删除标签', exact: true }).click();
   await expect(labelRow).toHaveCount(0);

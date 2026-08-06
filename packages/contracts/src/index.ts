@@ -7,7 +7,14 @@ export const taskStatusSchema = z.enum([
   'completed'
 ]);
 
-export const eventStatusSchema = z.enum(['creating', 'in_progress', 'completed']);
+export const eventStatusSchema = z.enum([
+  'creating',
+  'ready',
+  'in_progress',
+  'paused',
+  'awaiting_progress',
+  'completed'
+]);
 
 export const labelIconValues = [
   'tag',
@@ -74,7 +81,15 @@ export const stateChangeSchema = z.object({
   taskId: z.string().uuid(),
   fromStatus: taskStatusSchema,
   toStatus: taskStatusSchema,
+  comment: z.string().max(500).nullable(),
   changedAt: z.string()
+});
+
+export const taskCommentSchema = z.object({
+  id: z.string().uuid(),
+  taskId: z.string().uuid(),
+  content: z.string().min(1).max(1000),
+  createdAt: z.string()
 });
 
 export const eventSummarySchema = z.object({
@@ -136,7 +151,12 @@ export const createDependencyInputSchema = z.object({
 
 export const transitionInputSchema = z.object({
   toStatus: taskStatusSchema.exclude(['not_started']),
-  confirmSoftDependencies: z.boolean().default(false)
+  confirmSoftDependencies: z.boolean().default(false),
+  comment: z.string().trim().max(500).default('')
+});
+
+export const createTaskCommentInputSchema = z.object({
+  content: z.string().trim().min(1).max(1000)
 });
 
 export const createLabelInputSchema = z.object({
@@ -155,7 +175,7 @@ export const updateLabelInputSchema = z.object({
 );
 
 export const backupEnvelopeSchema = z.object({
-  schemaVersion: z.literal(2),
+  schemaVersion: z.literal(3),
   exportedAt: z.string(),
   labels: z.array(z.object({
     id: z.string().uuid(), name: z.string(), color: z.string(), icon: labelIconSchema.default('tag'), createdAt: z.string()
@@ -166,7 +186,8 @@ export const backupEnvelopeSchema = z.object({
   eventLabels: z.array(z.object({ eventId: z.string().uuid(), labelId: z.string().uuid() })),
   tasks: z.array(taskSchema),
   dependencies: z.array(dependencySchema),
-  stateChanges: z.array(stateChangeSchema)
+  stateChanges: z.array(stateChangeSchema),
+  taskComments: z.array(taskCommentSchema)
 });
 
 export type TaskStatus = z.infer<typeof taskStatusSchema>;
@@ -176,6 +197,7 @@ export type Label = z.infer<typeof labelSchema>;
 export type Task = z.infer<typeof taskSchema>;
 export type Dependency = z.infer<typeof dependencySchema>;
 export type StateChange = z.infer<typeof stateChangeSchema>;
+export type TaskComment = z.infer<typeof taskCommentSchema>;
 export type EventSummary = z.infer<typeof eventSummarySchema>;
 export type EventGraph = z.infer<typeof eventGraphSchema>;
 export type BackupEnvelope = z.infer<typeof backupEnvelopeSchema>;
@@ -186,5 +208,6 @@ export type UpdateTaskInput = z.infer<typeof updateTaskInputSchema>;
 export type UpdateLayoutInput = z.infer<typeof updateLayoutInputSchema>;
 export type CreateDependencyInput = z.infer<typeof createDependencyInputSchema>;
 export type TransitionInput = z.infer<typeof transitionInputSchema>;
+export type CreateTaskCommentInput = z.infer<typeof createTaskCommentInputSchema>;
 export type CreateLabelInput = z.input<typeof createLabelInputSchema>;
 export type UpdateLabelInput = z.input<typeof updateLabelInputSchema>;

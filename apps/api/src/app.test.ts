@@ -17,6 +17,16 @@ describe('API', () => {
     expect(archived.json().archivedAt).toBeTruthy();
   });
 
+  it('filters by the expanded event statuses', async () => {
+    const created = await app.inject({ method: 'POST', url: '/api/events', payload: { title: '待开始事件', description: '', labelIds: [] } });
+    const event = created.json();
+    await app.inject({ method: 'POST', url: `/api/events/${event.id}/tasks`, payload: { title: '任务', description: '', positionX: 0, positionY: 0 } });
+
+    const response = await app.inject({ method: 'GET', url: '/api/events?status=ready' });
+    expect(response.statusCode, response.body).toBe(200);
+    expect(response.json()).toEqual([expect.objectContaining({ id: event.id, status: 'ready' })]);
+  });
+
   it('permanently deletes progressed tasks', async () => {
     const created = await app.inject({ method: 'POST', url: '/api/events', payload: { title: '事件', description: '', labelIds: [] } });
     const event = created.json();
@@ -26,6 +36,16 @@ describe('API', () => {
     const deleted = await app.inject({ method: 'DELETE', url: `/api/tasks/${task.id}` });
     expect(deleted.statusCode, deleted.body).toBe(204);
     expect((await app.inject({ method: 'GET', url: `/api/tasks/${task.id}/history` })).statusCode).toBe(404);
+  });
+
+  it('creates, lists, and deletes task comments', async () => {
+    const created = await app.inject({ method: 'POST', url: '/api/events', payload: { title: '评论事件', description: '', labelIds: [] } });
+    const taskResponse = await app.inject({ method: 'POST', url: `/api/events/${created.json().id}/tasks`, payload: { title: '任务', description: '', positionX: 0, positionY: 0 } });
+    const task = taskResponse.json();
+    const comment = await app.inject({ method: 'POST', url: `/api/tasks/${task.id}/comments`, payload: { content: '评论内容' } });
+    expect(comment.statusCode, comment.body).toBe(201);
+    expect((await app.inject({ method: 'GET', url: `/api/tasks/${task.id}/comments` })).json()).toEqual([expect.objectContaining({ content: '评论内容' })]);
+    expect((await app.inject({ method: 'DELETE', url: `/api/task-comments/${comment.json().id}` })).statusCode).toBe(204);
   });
 
   it('reports the effective pre-restore backup directory', async () => {

@@ -4,11 +4,13 @@ import type {
   CreateEventInput,
   CreateLabelInput,
   CreateTaskInput,
+  EventStatus,
   EventGraph,
   EventSummary,
   Label,
   StateChange,
   Task,
+  TaskComment,
   TaskStatus,
   UpdateEventInput,
   UpdateLabelInput,
@@ -64,8 +66,11 @@ export const api = {
   createTask: (eventId: string, input: CreateTaskInput) => request<Task>(`/api/events/${eventId}/tasks`, { method: 'POST', ...json(input) }),
   updateTask: (taskId: string, input: UpdateTaskInput) => request<Task>(`/api/tasks/${taskId}`, { method: 'PATCH', ...json(input) }),
   deleteTask: (taskId: string) => request<void>(`/api/tasks/${taskId}`, { method: 'DELETE' }),
-  transitionTask: (taskId: string, toStatus: TaskStatus, confirmSoftDependencies = false) => request<{ task: Task }>(`/api/tasks/${taskId}/transition`, { method: 'POST', ...json({ toStatus, confirmSoftDependencies }) }),
+  transitionTask: (taskId: string, toStatus: TaskStatus, confirmSoftDependencies = false, comment = '') => request<{ task: Task }>(`/api/tasks/${taskId}/transition`, { method: 'POST', ...json({ toStatus, confirmSoftDependencies, comment }) }),
   getTaskHistory: (taskId: string) => request<StateChange[]>(`/api/tasks/${taskId}/history`),
+  listTaskComments: (taskId: string) => request<TaskComment[]>(`/api/tasks/${taskId}/comments`),
+  createTaskComment: (taskId: string, content: string) => request<TaskComment>(`/api/tasks/${taskId}/comments`, { method: 'POST', ...json({ content }) }),
+  deleteTaskComment: (id: string) => request<void>(`/api/task-comments/${id}`, { method: 'DELETE' }),
   updateLayout: (eventId: string, input: UpdateLayoutInput) => request<void>(`/api/events/${eventId}/layout`, { method: 'PATCH', ...json(input) }),
   createDependency: (eventId: string, input: CreateDependencyInput) => request(`/api/events/${eventId}/dependencies`, { method: 'POST', ...json(input) }),
   deleteDependency: (id: string) => request<void>(`/api/dependencies/${id}`, { method: 'DELETE' }),
@@ -102,7 +107,14 @@ export function downloadBlob(filename: string, blob: Blob) {
   URL.revokeObjectURL(url);
 }
 
-export const eventStatusText = { creating: '创建中', in_progress: '进行中', completed: '已完成' } as const;
+export const eventStatusText: Record<EventStatus, string> = {
+  creating: '创建中',
+  ready: '待开始',
+  in_progress: '进行中',
+  paused: '已暂停',
+  awaiting_progress: '待推进',
+  completed: '已完成'
+};
 export const taskStatusText: Record<TaskStatus, string> = {
   not_started: '未开始', in_progress: '进行中', paused: '已暂停', completed: '已完成'
 };

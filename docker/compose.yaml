@@ -8,7 +8,7 @@ services:
       dockerfile: docker/Dockerfile
       target: api
       args:
-        SAGNEX_APT_MIRROR: ${SAGNEX_APT_MIRROR:-https://mirrors.tuna.tsinghua.edu.cn}
+        SAGNEX_APT_MIRROR: ${SAGNEX_APT_MIRROR:-http://mirrors.tuna.tsinghua.edu.cn}
         SAGNEX_NPM_REGISTRY: ${SAGNEX_NPM_REGISTRY:-https://registry.npmmirror.com}
     restart: unless-stopped
     environment:
@@ -42,7 +42,7 @@ services:
       dockerfile: docker/Dockerfile
       target: web
       args:
-        SAGNEX_APT_MIRROR: ${SAGNEX_APT_MIRROR:-https://mirrors.tuna.tsinghua.edu.cn}
+        SAGNEX_APT_MIRROR: ${SAGNEX_APT_MIRROR:-http://mirrors.tuna.tsinghua.edu.cn}
         SAGNEX_NPM_REGISTRY: ${SAGNEX_NPM_REGISTRY:-https://registry.npmmirror.com}
     restart: unless-stopped
     depends_on:

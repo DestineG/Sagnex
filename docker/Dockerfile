@@ -1,6 +1,6 @@
 FROM node:22-bookworm-slim AS build
 
-ARG SAGNEX_APT_MIRROR=https://mirrors.tuna.tsinghua.edu.cn
+ARG SAGNEX_APT_MIRROR=http://mirrors.tuna.tsinghua.edu.cn
 ARG SAGNEX_NPM_REGISTRY=https://registry.npmmirror.com
 
 ENV PNPM_HOME=/pnpm
@@ -8,7 +8,7 @@ ENV PATH=$PNPM_HOME:$PATH
 
 RUN sed -i -E "s|https?://deb.debian.org|${SAGNEX_APT_MIRROR}|g" /etc/apt/sources.list.d/debian.sources \
     && apt-get update \
-    && apt-get install -y --no-install-recommends g++ make python3 \
+    && apt-get install -y --no-install-recommends ca-certificates g++ make python3 \
     && rm -rf /var/lib/apt/lists/* \
     && npm install --global pnpm@11.9.0 --registry="${SAGNEX_NPM_REGISTRY}"
 

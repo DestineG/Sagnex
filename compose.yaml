@@ -13,14 +13,15 @@ services:
       SAGNEX_API_PORT: 4784
       SAGNEX_DATA_DIR: /data
       SAGNEX_BACKUP_DIR: /backups
+    user: "${SAGNEX_DOCKER_USER:-1000:1000}"
     volumes:
       - type: bind
-        source: ${SAGNEX_DATA_PATH:-./docker-data/database}
+        source: ${SAGNEX_DATA_DIR:-./data}
         target: /data
         bind:
           create_host_path: true
       - type: bind
-        source: ${SAGNEX_BACKUP_PATH:-./docker-data/backups}
+        source: ${SAGNEX_BACKUP_DIR:-./data/backups}
         target: /backups
         bind:
           create_host_path: true

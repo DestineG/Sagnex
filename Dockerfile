@@ -42,6 +42,8 @@ COPY --from=build /app/packages/contracts/dist ./packages/contracts/dist
 
 EXPOSE 4784
 
+USER node
+
 CMD ["node", "apps/api/dist/server.js"]
 
 FROM nginx:1.27-alpine AS web

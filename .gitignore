@@ -15,4 +15,6 @@ test-results/
 .env.local
 exports/
 backups/
-docker-data/
+config/sagnex.env
+data/
+.sagnex/

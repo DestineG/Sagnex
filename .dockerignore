@@ -2,11 +2,12 @@
 .gitignore
 .env
 .env.*
-!.env.docker.example
 **/node_modules
 **/dist
+.sagnex
+config/sagnex.env
 coverage
-docker-data
+data
 playwright-report
 test-results
 *.log

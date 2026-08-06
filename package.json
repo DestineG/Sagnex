@@ -1,0 +1,31 @@
+{
+  "name": "sagnex",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "packageManager": "pnpm@11.9.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @sagnex/contracts build && concurrently -k -n api,web -c green,blue \"pnpm --filter @sagnex/api dev\" \"pnpm --filter @sagnex/web dev\"",
+    "build": "pnpm -r --sort build",
+    "start": "node scripts/start.mjs",
+    "typecheck": "pnpm --filter @sagnex/contracts build && pnpm -r --if-present typecheck",
+    "lint": "eslint .",
+    "test": "pnpm --filter @sagnex/contracts build && pnpm -r --if-present test",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@playwright/test": "^1.55.0",
+    "@types/node": "^22.10.0",
+    "concurrently": "^9.2.1",
+    "eslint": "^9.39.1",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "globals": "^16.5.0",
+    "open": "^10.2.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.46.3"
+  }
+}

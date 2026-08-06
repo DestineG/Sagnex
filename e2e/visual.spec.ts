@@ -42,15 +42,18 @@ test('renders active cards and editor across desktop and mobile', async ({ page,
   await expect(page.locator('.inspector input').first()).toHaveValue('封面确认');
   await expect(page.locator('.canvas-minimap')).toBeVisible();
   await page.waitForTimeout(400);
-  const minimapSvg = page.locator('.react-flow__minimap-svg');
-  const minimapNode = page.locator('.react-flow__minimap-node').first();
+  const minimapSvg = page.locator('.canvas-minimap-svg');
+  const minimapNode = page.locator('.canvas-minimap-node').first();
   expect((await minimapSvg.boundingBox())!.width).toBeGreaterThan(180);
   expect((await minimapNode.boundingBox())!.width).toBeGreaterThan(10);
   const readMinimapViewport = async () => {
-    const path = await page.locator('.react-flow__minimap-mask').getAttribute('d');
-    const matches = [...path!.matchAll(/M([\d.eE+-]+),([\d.eE+-]+)h([\d.eE+-]+)v([\d.eE+-]+)/g)];
-    const viewport = matches.at(-1)!;
-    return { x: Number(viewport[1]), y: Number(viewport[2]), width: Number(viewport[3]), height: Number(viewport[4]) };
+    const viewport = page.getByTestId('minimap-viewport');
+    return {
+      x: Number(await viewport.getAttribute('data-world-x')),
+      y: Number(await viewport.getAttribute('data-world-y')),
+      width: Number(await viewport.getAttribute('data-world-width')),
+      height: Number(await viewport.getAttribute('data-world-height'))
+    };
   };
   const viewportBeforePan = await readMinimapViewport();
   const paneBox = await page.locator('.react-flow__pane').boundingBox();

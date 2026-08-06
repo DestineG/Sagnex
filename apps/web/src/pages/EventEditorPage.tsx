@@ -2,12 +2,12 @@ import type { EventGraph, Label, StateChange, Task, TaskStatus } from '@sagnex/c
 import dagre from '@dagrejs/dagre';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Background, Controls, Handle, MarkerType, MiniMap, Position, ReactFlow, ReactFlowProvider,
-  useEdgesState, useNodesState, useReactFlow,
+  Background, Controls, Handle, MarkerType, Position, ReactFlow, ReactFlowProvider,
+  useEdgesState, useNodesState, useReactFlow, useViewport,
   type Connection, type Edge, type Node, type NodeProps
 } from '@xyflow/react';
 import { Archive, ArchiveRestore, ArrowLeft, Check, CheckCircle2, ChevronDown, Circle, CirclePlay, Download, FileJson, ImageDown, LayoutTemplate, Maximize2, Pause, PauseCircle, Play, Plus, Trash2 } from 'lucide-react';
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ApiError, api, downloadBlob, downloadJson, eventStatusText, exportStamp, formatDate, formatStatusDate, taskStatusText } from '../api';
 import { Dialog } from '../components/Dialog';
@@ -46,6 +46,131 @@ const miniMapStrokes: Record<TaskStatus, string> = {
   paused: '#a85e12',
   completed: '#28748f'
 };
+const MINI_MAP_WIDTH = 220;
+const MINI_MAP_HEIGHT = 140;
+const MINI_MAP_PADDING = 12;
+
+function CanvasMiniMap({ nodes, edges, canvasWidth, canvasHeight }: { nodes: TaskFlowNode[]; edges: Edge[]; canvasWidth: number; canvasHeight: number }) {
+  const viewport = useViewport();
+  const { setViewport } = useReactFlow();
+  const geometry = useMemo(() => {
+    const visible = {
+      x: -viewport.x / viewport.zoom,
+      y: -viewport.y / viewport.zoom,
+      width: Math.max(1, canvasWidth / viewport.zoom),
+      height: Math.max(1, canvasHeight / viewport.zoom)
+    };
+    const graphBounds = nodes.length > 0 ? {
+      minX: Math.min(...nodes.map((node) => node.position.x)),
+      minY: Math.min(...nodes.map((node) => node.position.y)),
+      maxX: Math.max(...nodes.map((node) => node.position.x + FLOW_NODE_WIDTH)),
+      maxY: Math.max(...nodes.map((node) => node.position.y + FLOW_NODE_HEIGHT))
+    } : { minX: visible.x, minY: visible.y, maxX: visible.x + visible.width, maxY: visible.y + visible.height };
+    const minX = Math.min(graphBounds.minX, visible.x);
+    const minY = Math.min(graphBounds.minY, visible.y);
+    const maxX = Math.max(graphBounds.maxX, visible.x + visible.width);
+    const maxY = Math.max(graphBounds.maxY, visible.y + visible.height);
+    const worldWidth = Math.max(1, maxX - minX);
+    const worldHeight = Math.max(1, maxY - minY);
+    const innerWidth = MINI_MAP_WIDTH - MINI_MAP_PADDING * 2;
+    const innerHeight = MINI_MAP_HEIGHT - MINI_MAP_PADDING * 2;
+    const scale = Math.min(innerWidth / worldWidth, innerHeight / worldHeight);
+    const offsetX = MINI_MAP_PADDING + (innerWidth - worldWidth * scale) / 2 - minX * scale;
+    const offsetY = MINI_MAP_PADDING + (innerHeight - worldHeight * scale) / 2 - minY * scale;
+    const mapX = (value: number) => value * scale + offsetX;
+    const mapY = (value: number) => value * scale + offsetY;
+    return {
+      visible,
+      scale,
+      offsetX,
+      offsetY,
+      viewportRect: {
+        x: mapX(visible.x),
+        y: mapY(visible.y),
+        width: visible.width * scale,
+        height: visible.height * scale
+      },
+      mapX,
+      mapY
+    };
+  }, [canvasHeight, canvasWidth, nodes, viewport.x, viewport.y, viewport.zoom]);
+  const nodesById = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
+
+  function moveViewport(event: ReactPointerEvent<SVGSVGElement>) {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const svgX = (event.clientX - bounds.left) * MINI_MAP_WIDTH / bounds.width;
+    const svgY = (event.clientY - bounds.top) * MINI_MAP_HEIGHT / bounds.height;
+    const worldX = (svgX - geometry.offsetX) / geometry.scale;
+    const worldY = (svgY - geometry.offsetY) / geometry.scale;
+    void setViewport({
+      x: canvasWidth / 2 - worldX * viewport.zoom,
+      y: canvasHeight / 2 - worldY * viewport.zoom,
+      zoom: viewport.zoom
+    });
+  }
+
+  return <div className="canvas-minimap">
+    <svg
+      className="canvas-minimap-svg"
+      viewBox={`0 0 ${MINI_MAP_WIDTH} ${MINI_MAP_HEIGHT}`}
+      role="img"
+      aria-label="画布缩略图"
+      onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); moveViewport(event); }}
+      onPointerMove={(event) => { if (event.buttons === 1) moveViewport(event); }}
+    >
+      <g className="canvas-minimap-edges">
+        {edges.map((edge) => {
+          const source = nodesById.get(edge.source);
+          const target = nodesById.get(edge.target);
+          if (!source || !target) return null;
+          const sourceX = geometry.mapX(source.position.x + FLOW_NODE_WIDTH / 2);
+          const sourceY = geometry.mapY(source.position.y + FLOW_NODE_HEIGHT / 2);
+          const targetX = geometry.mapX(target.position.x + FLOW_NODE_WIDTH / 2);
+          const targetY = geometry.mapY(target.position.y + FLOW_NODE_HEIGHT / 2);
+          const bend = Math.max(7, Math.abs(targetX - sourceX) * 0.42);
+          return <path key={edge.id} d={`M ${sourceX} ${sourceY} C ${sourceX + bend} ${sourceY}, ${targetX - bend} ${targetY}, ${targetX} ${targetY}`} />;
+        })}
+      </g>
+      <g className="canvas-minimap-nodes">
+        {nodes.map((node) => {
+          const mappedWidth = Math.max(9, FLOW_NODE_WIDTH * geometry.scale);
+          const mappedHeight = Math.max(6, FLOW_NODE_HEIGHT * geometry.scale);
+          const centerX = geometry.mapX(node.position.x + FLOW_NODE_WIDTH / 2);
+          const centerY = geometry.mapY(node.position.y + FLOW_NODE_HEIGHT / 2);
+          return <rect
+            key={node.id}
+            className="canvas-minimap-node"
+            x={centerX - mappedWidth / 2}
+            y={centerY - mappedHeight / 2}
+            width={mappedWidth}
+            height={mappedHeight}
+            rx={2}
+            fill={miniMapColors[node.data.status]}
+            stroke={miniMapStrokes[node.data.status]}
+          />;
+        })}
+      </g>
+      <path
+        className="canvas-minimap-mask"
+        fillRule="evenodd"
+        d={`M 0 0 H ${MINI_MAP_WIDTH} V ${MINI_MAP_HEIGHT} H 0 Z M ${geometry.viewportRect.x} ${geometry.viewportRect.y} H ${geometry.viewportRect.x + geometry.viewportRect.width} V ${geometry.viewportRect.y + geometry.viewportRect.height} H ${geometry.viewportRect.x} Z`}
+      />
+      <rect
+        className="canvas-minimap-viewport"
+        data-testid="minimap-viewport"
+        data-world-x={geometry.visible.x}
+        data-world-y={geometry.visible.y}
+        data-world-width={geometry.visible.width}
+        data-world-height={geometry.visible.height}
+        x={geometry.viewportRect.x}
+        y={geometry.viewportRect.y}
+        width={geometry.viewportRect.width}
+        height={geometry.viewportRect.height}
+        rx={2}
+      />
+    </svg>
+  </div>;
+}
 
 function TaskDialog({ onClose, onCreate }: { onClose: () => void; onCreate: (value: { title: string; description: string }) => Promise<void> }) {
   const [title, setTitle] = useState('');
@@ -119,6 +244,8 @@ function Editor({ graph, labels, onExportJson, onArchive, onRestoreEvent }: { gr
   const [taskDialog, setTaskDialog] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState('');
+  const flowCanvasRef = useRef<HTMLDivElement>(null);
+  const [canvasSize, setCanvasSize] = useState({ width: 1, height: 1 });
   const { fitView } = useReactFlow();
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey: ['event', graph.id] });
@@ -134,6 +261,15 @@ function Editor({ graph, labels, onExportJson, onArchive, onRestoreEvent }: { gr
   useEffect(() => setNodes((current) => current.map((node) => ({ ...node, selected: node.id === selectedTaskId }))), [mappedNodes, selectedTaskId, setNodes]);
   useEffect(() => setEdges(mappedEdges), [mappedEdges, setEdges]);
   useEffect(() => { if (selectedTaskId) window.setTimeout(() => void fitView({ nodes: [{ id: selectedTaskId }], padding: 1.2, duration: 250, maxZoom: 1.25 }), 50); }, [fitView, selectedTaskId]);
+  useLayoutEffect(() => {
+    const element = flowCanvasRef.current;
+    if (!element) return;
+    const update = () => setCanvasSize({ width: element.clientWidth, height: element.clientHeight });
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
 
   const selectedTask = graph.tasks.find((task) => task.id === selectedTaskId);
   const { data: history = [] } = useQuery({ queryKey: ['task-history', selectedTaskId], queryFn: () => api.getTaskHistory(selectedTaskId!), enabled: Boolean(selectedTaskId) });
@@ -214,7 +350,7 @@ function Editor({ graph, labels, onExportJson, onArchive, onRestoreEvent }: { gr
     <div className="editor-body">
     <div className="flow-column">
       {error && <div className="canvas-error"><span>{error}</span><button onClick={() => setError('')} aria-label="关闭">×</button></div>}
-      <div className="flow-canvas">
+      <div className="flow-canvas" ref={flowCanvasRef}>
         <ReactFlow
           nodes={nodes} edges={edges} nodeTypes={nodeTypes}
           onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
@@ -226,20 +362,7 @@ function Editor({ graph, labels, onExportJson, onArchive, onRestoreEvent }: { gr
           nodesDraggable={!graph.archivedAt} nodesConnectable={!graph.archivedAt}
           edgesFocusable={!graph.archivedAt} deleteKeyCode={graph.archivedAt ? null : ['Backspace', 'Delete']}
           fitView fitViewOptions={{ padding: 0.22, maxZoom: 1.2 }} minZoom={0.25} maxZoom={1.6} proOptions={{ hideAttribution: true }}
-        ><Background gap={20} size={1} /><Controls showInteractive={false} /><MiniMap<TaskFlowNode>
-          className="canvas-minimap"
-          ariaLabel="画布缩略图"
-          pannable
-          zoomable
-          nodeBorderRadius={7}
-          nodeStrokeWidth={5}
-          nodeColor={(node) => miniMapColors[node.data.status]}
-          nodeStrokeColor={(node) => miniMapStrokes[node.data.status]}
-          bgColor="#f5f8f6"
-          maskColor="rgb(19 82 58 / 9%)"
-          maskStrokeColor="#0b6948"
-          maskStrokeWidth={2}
-        /></ReactFlow>
+        ><Background gap={20} size={1} /><Controls showInteractive={false} /><CanvasMiniMap nodes={nodes} edges={edges} canvasWidth={canvasSize.width} canvasHeight={canvasSize.height} /></ReactFlow>
       </div>
     </div>
     <aside className="inspector">

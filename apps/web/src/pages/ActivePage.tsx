@@ -5,8 +5,8 @@ import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, downloadBlob, eventStatusText, exportStamp, formatDate } from '../api';
 import { EventFormDialog } from '../components/EventFormDialog';
+import { EventTagSummary } from '../components/EventTagSummary';
 import { MiniGraph } from '../components/MiniGraph';
-import { LabelIconView } from '../components/LabelIcon';
 
 export function ActivePage() {
   const navigate = useNavigate();
@@ -70,10 +70,7 @@ export function ActivePage() {
               <div className="event-card-summary">
                 <h2>{event.title}</h2>
                 <p>{event.description || '暂无简介'}</p>
-                <div className="event-card-tags" title={event.labels.map((label) => label.name).join('、')}>
-                  {event.labels.slice(0, 2).map((label) => <span className="tag" key={label.id}><LabelIconView icon={label.icon} /><i style={{ background: label.color }} /><span className="tag-name">{label.name}</span></span>)}
-                  {event.labels.length > 2 && <span className="tag tag-count">+{event.labels.length - 2}</span>}
-                </div>
+                <EventTagSummary labels={event.labels} className="event-card-tags" onOpen={() => navigate(`/events/${event.id}`)} />
               </div>
               <div className="event-card-progress">
                 <span className={`status-badge status-${event.status}`}>{eventStatusText[event.status]}</span>

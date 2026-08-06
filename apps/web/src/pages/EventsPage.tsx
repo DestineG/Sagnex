@@ -6,25 +6,10 @@ import { useNavigate } from 'react-router-dom';
 import { api, eventStatusText, formatDate } from '../api';
 import { Dialog } from '../components/Dialog';
 import { EventFormDialog } from '../components/EventFormDialog';
+import { EventTagSummary } from '../components/EventTagSummary';
 import { LabelPicker } from '../components/LabelPicker';
-import { LabelIconView } from '../components/LabelIcon';
 
 type StatusFilter = 'all' | EventStatus | 'archived';
-
-function EventTags({ labels }: { labels: Awaited<ReturnType<typeof api.listLabels>> }) {
-  if (labels.length === 0) return <span className="muted">未分类</span>;
-  const visible = labels.slice(0, 2);
-  const hidden = labels.slice(2);
-  return <div className="event-tile-tags" onClick={(event) => event.stopPropagation()}>
-    {visible.map((label) => <span className="tag" key={label.id}><LabelIconView icon={label.icon} /><i style={{ background: label.color }} />{label.name}</span>)}
-    {hidden.length > 0 && <details className="tag-overflow">
-      <summary>+{hidden.length}</summary>
-      <div className="tag-overflow-popover">
-        {labels.map((label) => <span className="tag" key={label.id}><LabelIconView icon={label.icon} /><i style={{ background: label.color }} />{label.name}</span>)}
-      </div>
-    </details>}
-  </div>;
-}
 
 export function EventsPage() {
   const navigate = useNavigate();
@@ -67,7 +52,7 @@ export function EventsPage() {
       {events.map((event) => <article className="event-tile" key={event.id} tabIndex={0} onClick={() => navigate(`/events/${event.id}`)} onKeyDown={(keyEvent) => { if (keyEvent.key === 'Enter' && keyEvent.target === keyEvent.currentTarget) navigate(`/events/${event.id}`); }}>
         <header className="event-tile-head"><strong>{event.title}</strong><span className={`status-badge status-${event.status}`}>{eventStatusText[event.status]}</span></header>
         <p className="event-tile-description">{event.description || '暂无简介'}</p>
-        <EventTags labels={event.labels} />
+        <EventTagSummary labels={event.labels} className="event-tile-tags" />
         <footer className="event-tile-foot">
           <span>{event.completedTasks} / {event.totalTasks}</span>
           <span className="progress"><i style={{ width: `${event.totalTasks ? (event.completedTasks / event.totalTasks) * 100 : 0}%` }} /></span>

@@ -44,7 +44,17 @@ const now = () => new Date().toISOString();
 const normalizeLabel = (value: string) => value.trim().toLocaleLowerCase();
 
 export class SagnexStore {
-  constructor(private readonly context: DatabaseContext) {}
+  private readonly backupDirectory: string | null;
+
+  constructor(private readonly context: DatabaseContext, options: { backupDirectory?: string } = {}) {
+    this.backupDirectory = context.path === ':memory:'
+      ? null
+      : options.backupDirectory ?? join(dirname(context.path), 'backups');
+  }
+
+  getBackupDirectory(): string | null {
+    return this.backupDirectory;
+  }
 
   async listLabels(): Promise<Label[]> {
     const rows = await this.context.db
@@ -382,10 +392,9 @@ export class SagnexStore {
     }
     this.validateBackupReferences(backup);
     let backupPath: string | null = null;
-    if (this.context.path !== ':memory:') {
-      const backupDirectory = join(dirname(this.context.path), 'backups');
-      mkdirSync(backupDirectory, { recursive: true });
-      backupPath = join(backupDirectory, `sagnex-${new Date().toISOString().replace(/[:.]/g, '-')}.sqlite`);
+    if (this.backupDirectory) {
+      mkdirSync(this.backupDirectory, { recursive: true });
+      backupPath = join(this.backupDirectory, `sagnex-${new Date().toISOString().replace(/[:.]/g, '-')}.sqlite`);
       await this.context.raw.backup(backupPath);
     }
     const replace = this.context.raw.transaction(() => {

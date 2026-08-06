@@ -1,12 +1,34 @@
 import { spawn } from 'node:child_process';
+import { resolve } from 'node:path';
 import process from 'node:process';
 import open from 'open';
 
 const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
 const children = [];
+const args = process.argv.slice(2);
+
+function readOption(name) {
+  const equalsPrefix = `${name}=`;
+  const equalsArgument = args.find((argument) => argument.startsWith(equalsPrefix));
+  if (equalsArgument) return equalsArgument.slice(equalsPrefix.length);
+  const index = args.indexOf(name);
+  if (index === -1) return undefined;
+  const value = args[index + 1];
+  if (!value || value.startsWith('--')) {
+    globalThis.console.error(`${name} requires a directory path.`);
+    process.exit(1);
+  }
+  return value;
+}
+
+const backupDirectoryArgument = readOption('--backup-dir');
+const backupDirectory = backupDirectoryArgument ? resolve(backupDirectoryArgument) : undefined;
+const childEnvironment = backupDirectory
+  ? { ...process.env, SAGNEX_BACKUP_DIR: backupDirectory }
+  : process.env;
 
 function run(args) {
-  const child = spawn(pnpm, args, { stdio: 'inherit', env: process.env, shell: process.platform === 'win32' });
+  const child = spawn(pnpm, args, { stdio: 'inherit', env: childEnvironment, shell: process.platform === 'win32' });
   children.push(child);
   child.on('exit', (code) => {
     if (code && code !== 0) shutdown(code);
@@ -30,6 +52,10 @@ const existingApi = await globalThis.fetch(apiUrl).then((response) => response.j
 const existingWeb = await globalThis.fetch(url).then((response) => response.ok).catch(() => false);
 
 if (existingApi && existingWeb) {
+  if (backupDirectory) {
+    globalThis.console.error('Sagnex is already running. Stop it before changing --backup-dir.');
+    process.exit(1);
+  }
   await open(url);
   process.exit(0);
 }

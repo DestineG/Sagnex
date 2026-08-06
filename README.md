@@ -27,7 +27,20 @@ $env:SAGNEX_DATA_DIR='D:\SagnexData'
 pnpm start
 ```
 
-导入 JSON 备份前，服务会在数据库同级的 `backups` 目录自动保存当前数据库副本。
+导入 JSON 或恢复 WebDAV 备份前，服务会自动保存当前 SQLite 数据库。默认目录是数据库同级的 `backups`，可以在启动时覆盖：
+
+```powershell
+pnpm start -- --backup-dir 'D:\SagnexBackups'
+```
+
+也可以使用环境变量：
+
+```powershell
+$env:SAGNEX_BACKUP_DIR='D:\SagnexBackups'
+pnpm start
+```
+
+数据页会显示当前生效的恢复前安全备份目录。启动参数变化需要重启 Sagnex。
 
 ## 验证
 

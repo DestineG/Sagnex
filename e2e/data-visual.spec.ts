@@ -32,3 +32,17 @@ test('keeps the data page dense across desktop and mobile', async ({ page }) => 
   await expect(page.locator('.backup-tile')).toHaveCount(5);
   await page.screenshot({ path: 'test-results/data-mobile.png', fullPage: true });
 });
+
+test('keeps both backup modules visible when the remote directory is empty', async ({ page }) => {
+  await page.route('**/api/webdav/config', (route) => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({ endpoint: 'https://dav.example.test/dav', username: 'user@example.test', remotePath: 'Sagnex', passwordSet: true })
+  }));
+  await page.route('**/api/webdav/backups', (route) => route.fulfill({ contentType: 'application/json', body: '[]' }));
+
+  await page.goto('/data');
+  await expect(page.getByRole('heading', { name: '最新备份' })).toBeVisible();
+  await expect(page.getByText('还没有最新备份')).toBeVisible();
+  await expect(page.getByRole('heading', { name: '版本备份' })).toBeVisible();
+  await expect(page.getByText('还没有版本备份')).toBeVisible();
+});

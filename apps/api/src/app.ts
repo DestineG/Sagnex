@@ -28,9 +28,9 @@ const webDavConfigSchema = z.object({
   remotePath: z.string().trim().min(1).max(320).default('Sagnex')
 });
 
-export function createApp(context: DatabaseContext, options: { fetcher?: typeof fetch } = {}) {
+export function createApp(context: DatabaseContext, options: { fetcher?: typeof fetch; backupDirectory?: string } = {}) {
   const app = Fastify({ logger: false, bodyLimit: 25 * 1024 * 1024 });
-  const store = new SagnexStore(context);
+  const store = new SagnexStore(context, { backupDirectory: options.backupDirectory });
   const webdav = new WebDavService(context, store, options.fetcher);
 
   app.register(cors, {
@@ -134,6 +134,7 @@ export function createApp(context: DatabaseContext, options: { fetcher?: typeof 
     const [events, labels] = await Promise.all([store.listEvents(), store.listLabels()]);
     return {
       databasePath: context.path,
+      backupDirectory: store.getBackupDirectory(),
       eventCount: events.length,
       taskCount: events.reduce((sum, event) => sum + event.totalTasks, 0),
       labelCount: labels.length

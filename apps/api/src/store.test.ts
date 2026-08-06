@@ -1,4 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { createDatabase, type DatabaseContext } from './database.js';
 import { SagnexStore, StoreError } from './store.js';
 
@@ -78,6 +81,22 @@ describe('SagnexStore', () => {
     expect(events).toHaveLength(1);
     expect(events[0]?.title).toBe('保留');
     expect(await store.getTaskHistory(task.id)).toHaveLength(1);
+  });
+
+  it('writes the pre-restore database copy to the configured directory', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'sagnex-backup-dir-'));
+    const database = createDatabase(join(root, 'data', 'sagnex.sqlite'));
+    const configuredDirectory = join(root, 'safety-copies');
+    const diskStore = new SagnexStore(database, { backupDirectory: configuredDirectory });
+    try {
+      await diskStore.createEvent({ title: '恢复前数据', description: '', labelIds: [] });
+      const result = await diskStore.importBackup(await diskStore.exportBackup());
+      expect(result.backupPath).toContain(configuredDirectory);
+      expect(existsSync(result.backupPath!)).toBe(true);
+    } finally {
+      database.close();
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it('sanitizes custom SVG label icons before storage', async () => {

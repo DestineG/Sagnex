@@ -30,4 +30,10 @@ describe('API', () => {
     expect(restored.statusCode, restored.body).toBe(200);
     expect(restored.json()).toMatchObject({ restoredStatus: 'in_progress', task: { status: 'in_progress' } });
   });
+
+  it('reports the effective pre-restore backup directory', async () => {
+    const response = await app.inject({ method: 'GET', url: '/api/data/info' });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ databasePath: ':memory:', backupDirectory: null });
+  });
 });

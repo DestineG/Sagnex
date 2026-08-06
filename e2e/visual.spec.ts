@@ -46,6 +46,10 @@ test('renders active cards and editor across desktop and mobile', async ({ page,
   const minimapNode = page.locator('.canvas-minimap-node').first();
   expect((await minimapSvg.boundingBox())!.width).toBeGreaterThan(180);
   expect((await minimapNode.boundingBox())!.width).toBeGreaterThan(10);
+  const initialMinimapBox = (await minimapSvg.boundingBox())!;
+  const initialFrameBox = (await page.getByTestId('minimap-viewport').boundingBox())!;
+  expect(initialFrameBox.width / initialMinimapBox.width).toBeLessThan(0.65);
+  expect(initialFrameBox.height / initialMinimapBox.height).toBeLessThan(0.65);
   const readMinimapViewport = async () => {
     const viewport = page.getByTestId('minimap-viewport');
     return {
@@ -66,6 +70,19 @@ test('renders active cards and editor across desktop and mobile', async ({ page,
   const viewportAfterPan = await readMinimapViewport();
   expect(viewportAfterPan.width).toBeCloseTo(viewportBeforePan.width, 5);
   expect(viewportAfterPan.height).toBeCloseTo(viewportBeforePan.height, 5);
+  const frameAfterPan = (await page.getByTestId('minimap-viewport').boundingBox())!;
+  expect(frameAfterPan.width).toBeCloseTo(initialFrameBox.width, 1);
+  expect(frameAfterPan.height).toBeCloseTo(initialFrameBox.height, 1);
+
+  const dragDistance = 24;
+  await page.mouse.move(frameAfterPan.x + frameAfterPan.width / 2, frameAfterPan.y + frameAfterPan.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(frameAfterPan.x + frameAfterPan.width / 2 + dragDistance, frameAfterPan.y + frameAfterPan.height / 2, { steps: 4 });
+  await page.mouse.up();
+  await expect.poll(async () => (await page.getByTestId('minimap-viewport').boundingBox())!.x).toBeGreaterThan(frameAfterPan.x + 15);
+  const frameAfterDrag = (await page.getByTestId('minimap-viewport').boundingBox())!;
+  expect(frameAfterDrag.x - frameAfterPan.x).toBeCloseTo(dragDistance, 0);
+  expect(frameAfterDrag.width).toBeCloseTo(frameAfterPan.width, 1);
   await page.screenshot({ path: 'test-results/editor-desktop.png', fullPage: true });
   const canvasDownloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: '导出', exact: true }).click();

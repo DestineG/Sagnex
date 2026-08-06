@@ -13,6 +13,7 @@ import { ApiError, api, downloadBlob, downloadJson, eventStatusText, exportStamp
 import { Dialog } from '../components/Dialog';
 import { graphPngBlob } from '../components/GraphSvg';
 import { LabelPicker } from '../components/LabelPicker';
+import { createMiniMapBounds, expandMiniMapBounds, type WorldBounds } from '../components/canvasMiniMapGeometry';
 
 type TaskNodeData = { title: string; description: string; status: TaskStatus; statusChangedAt: string; archived: boolean };
 type TaskFlowNode = Node<TaskNodeData, 'task'>;
@@ -49,34 +50,58 @@ const miniMapStrokes: Record<TaskStatus, string> = {
 const MINI_MAP_WIDTH = 220;
 const MINI_MAP_HEIGHT = 140;
 const MINI_MAP_PADDING = 12;
+const MINI_MAP_ASPECT_RATIO = (MINI_MAP_WIDTH - MINI_MAP_PADDING * 2) / (MINI_MAP_HEIGHT - MINI_MAP_PADDING * 2);
 
 function CanvasMiniMap({ nodes, edges, canvasWidth, canvasHeight }: { nodes: TaskFlowNode[]; edges: Edge[]; canvasWidth: number; canvasHeight: number }) {
   const viewport = useViewport();
   const { setViewport } = useReactFlow();
+  const [worldBounds, setWorldBounds] = useState<WorldBounds | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const dragSnapshot = useRef<{
+    pointerId: number;
+    startClientX: number;
+    startClientY: number;
+    startViewport: typeof viewport;
+    scale: number;
+    mode: 'viewport' | 'recenter';
+    moved: boolean;
+  } | null>(null);
+  const visible = useMemo(() => ({
+    x: -viewport.x / viewport.zoom,
+    y: -viewport.y / viewport.zoom,
+    width: Math.max(1, canvasWidth / viewport.zoom),
+    height: Math.max(1, canvasHeight / viewport.zoom)
+  }), [canvasHeight, canvasWidth, viewport.x, viewport.y, viewport.zoom]);
+  const visibleRef = useRef(visible);
+  const graphBounds = useMemo<WorldBounds | null>(() => nodes.length > 0 ? {
+    minX: Math.min(...nodes.map((node) => node.position.x)),
+    minY: Math.min(...nodes.map((node) => node.position.y)),
+    maxX: Math.max(...nodes.map((node) => node.position.x + FLOW_NODE_WIDTH)),
+    maxY: Math.max(...nodes.map((node) => node.position.y + FLOW_NODE_HEIGHT))
+  } : null, [nodes]);
+  useEffect(() => {
+    visibleRef.current = visible;
+  }, [visible]);
+  useEffect(() => {
+    if (canvasWidth <= 1 || canvasHeight <= 1) return;
+    const frame = window.requestAnimationFrame(() => {
+      const latestVisible = visibleRef.current;
+      setWorldBounds((current) => current
+        ? expandMiniMapBounds(current, graphBounds, latestVisible.width, latestVisible.height, MINI_MAP_ASPECT_RATIO)
+        : createMiniMapBounds(latestVisible, graphBounds, MINI_MAP_ASPECT_RATIO));
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [canvasHeight, canvasWidth, graphBounds, visible.height, visible.width]);
+
   const geometry = useMemo(() => {
-    const visible = {
-      x: -viewport.x / viewport.zoom,
-      y: -viewport.y / viewport.zoom,
-      width: Math.max(1, canvasWidth / viewport.zoom),
-      height: Math.max(1, canvasHeight / viewport.zoom)
-    };
-    const graphBounds = nodes.length > 0 ? {
-      minX: Math.min(...nodes.map((node) => node.position.x)),
-      minY: Math.min(...nodes.map((node) => node.position.y)),
-      maxX: Math.max(...nodes.map((node) => node.position.x + FLOW_NODE_WIDTH)),
-      maxY: Math.max(...nodes.map((node) => node.position.y + FLOW_NODE_HEIGHT))
-    } : { minX: visible.x, minY: visible.y, maxX: visible.x + visible.width, maxY: visible.y + visible.height };
-    const minX = Math.min(graphBounds.minX, visible.x);
-    const minY = Math.min(graphBounds.minY, visible.y);
-    const maxX = Math.max(graphBounds.maxX, visible.x + visible.width);
-    const maxY = Math.max(graphBounds.maxY, visible.y + visible.height);
-    const worldWidth = Math.max(1, maxX - minX);
-    const worldHeight = Math.max(1, maxY - minY);
+    if (!worldBounds) return null;
+    const worldWidth = Math.max(1, worldBounds.maxX - worldBounds.minX);
+    const worldHeight = Math.max(1, worldBounds.maxY - worldBounds.minY);
     const innerWidth = MINI_MAP_WIDTH - MINI_MAP_PADDING * 2;
     const innerHeight = MINI_MAP_HEIGHT - MINI_MAP_PADDING * 2;
     const scale = Math.min(innerWidth / worldWidth, innerHeight / worldHeight);
-    const offsetX = MINI_MAP_PADDING + (innerWidth - worldWidth * scale) / 2 - minX * scale;
-    const offsetY = MINI_MAP_PADDING + (innerHeight - worldHeight * scale) / 2 - minY * scale;
+    const offsetX = MINI_MAP_PADDING + (innerWidth - worldWidth * scale) / 2 - worldBounds.minX * scale;
+    const offsetY = MINI_MAP_PADDING + (innerHeight - worldHeight * scale) / 2 - worldBounds.minY * scale;
     const mapX = (value: number) => value * scale + offsetX;
     const mapY = (value: number) => value * scale + offsetY;
     return {
@@ -93,30 +118,84 @@ function CanvasMiniMap({ nodes, edges, canvasWidth, canvasHeight }: { nodes: Tas
       mapX,
       mapY
     };
-  }, [canvasHeight, canvasWidth, nodes, viewport.x, viewport.y, viewport.zoom]);
+  }, [visible, worldBounds]);
   const nodesById = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
 
-  function moveViewport(event: ReactPointerEvent<SVGSVGElement>) {
+  if (!geometry) return null;
+  const activeGeometry = geometry;
+
+  function pointerToSvg(event: ReactPointerEvent<SVGSVGElement>) {
     const bounds = event.currentTarget.getBoundingClientRect();
-    const svgX = (event.clientX - bounds.left) * MINI_MAP_WIDTH / bounds.width;
-    const svgY = (event.clientY - bounds.top) * MINI_MAP_HEIGHT / bounds.height;
-    const worldX = (svgX - geometry.offsetX) / geometry.scale;
-    const worldY = (svgY - geometry.offsetY) / geometry.scale;
+    return {
+      x: (event.clientX - bounds.left) * MINI_MAP_WIDTH / bounds.width,
+      y: (event.clientY - bounds.top) * MINI_MAP_HEIGHT / bounds.height
+    };
+  }
+
+  function recenterViewport(event: ReactPointerEvent<SVGSVGElement>) {
+    const point = pointerToSvg(event);
+    const worldX = (point.x - activeGeometry.offsetX) / activeGeometry.scale;
+    const worldY = (point.y - activeGeometry.offsetY) / activeGeometry.scale;
     void setViewport({
       x: canvasWidth / 2 - worldX * viewport.zoom,
       y: canvasHeight / 2 - worldY * viewport.zoom,
       zoom: viewport.zoom
+    }, { duration: 180 });
+  }
+
+  function onPointerDown(event: ReactPointerEvent<SVGSVGElement>) {
+    const point = pointerToSvg(event);
+    const frame = activeGeometry.viewportRect;
+    const insideFrame = point.x >= frame.x && point.x <= frame.x + frame.width && point.y >= frame.y && point.y <= frame.y + frame.height;
+    dragSnapshot.current = {
+      pointerId: event.pointerId,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      startViewport: { ...viewport },
+      scale: activeGeometry.scale,
+      mode: insideFrame ? 'viewport' : 'recenter',
+      moved: false
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setDragging(insideFrame);
+  }
+
+  function onPointerMove(event: ReactPointerEvent<SVGSVGElement>) {
+    const snapshot = dragSnapshot.current;
+    if (!snapshot || snapshot.pointerId !== event.pointerId) return;
+    const deltaClientX = event.clientX - snapshot.startClientX;
+    const deltaClientY = event.clientY - snapshot.startClientY;
+    if (Math.hypot(deltaClientX, deltaClientY) > 3) snapshot.moved = true;
+    if (snapshot.mode !== 'viewport') return;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const worldDeltaX = deltaClientX * MINI_MAP_WIDTH / bounds.width / snapshot.scale;
+    const worldDeltaY = deltaClientY * MINI_MAP_HEIGHT / bounds.height / snapshot.scale;
+    void setViewport({
+      x: snapshot.startViewport.x - worldDeltaX * snapshot.startViewport.zoom,
+      y: snapshot.startViewport.y - worldDeltaY * snapshot.startViewport.zoom,
+      zoom: snapshot.startViewport.zoom
     });
+  }
+
+  function finishPointer(event: ReactPointerEvent<SVGSVGElement>, cancelled = false) {
+    const snapshot = dragSnapshot.current;
+    if (!snapshot || snapshot.pointerId !== event.pointerId) return;
+    if (!cancelled && snapshot.mode === 'recenter' && !snapshot.moved) recenterViewport(event);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    dragSnapshot.current = null;
+    setDragging(false);
   }
 
   return <div className="canvas-minimap">
     <svg
-      className="canvas-minimap-svg"
+      className={dragging ? 'canvas-minimap-svg dragging' : 'canvas-minimap-svg'}
       viewBox={`0 0 ${MINI_MAP_WIDTH} ${MINI_MAP_HEIGHT}`}
       role="img"
       aria-label="画布缩略图"
-      onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); moveViewport(event); }}
-      onPointerMove={(event) => { if (event.buttons === 1) moveViewport(event); }}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={(event) => finishPointer(event)}
+      onPointerCancel={(event) => finishPointer(event, true)}
     >
       <g className="canvas-minimap-edges">
         {edges.map((edge) => {
@@ -362,7 +441,7 @@ function Editor({ graph, labels, onExportJson, onArchive, onRestoreEvent }: { gr
           nodesDraggable={!graph.archivedAt} nodesConnectable={!graph.archivedAt}
           edgesFocusable={!graph.archivedAt} deleteKeyCode={graph.archivedAt ? null : ['Backspace', 'Delete']}
           fitView fitViewOptions={{ padding: 0.22, maxZoom: 1.2 }} minZoom={0.25} maxZoom={1.6} proOptions={{ hideAttribution: true }}
-        ><Background gap={20} size={1} /><Controls showInteractive={false} /><CanvasMiniMap nodes={nodes} edges={edges} canvasWidth={canvasSize.width} canvasHeight={canvasSize.height} /></ReactFlow>
+        ><Background gap={20} size={1} /><Controls showInteractive={false} /><CanvasMiniMap key={graph.id} nodes={nodes} edges={edges} canvasWidth={canvasSize.width} canvasHeight={canvasSize.height} /></ReactFlow>
       </div>
     </div>
     <aside className="inspector">

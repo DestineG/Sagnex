@@ -28,37 +28,15 @@ const webDavConfigSchema = z.object({
   remotePath: z.string().trim().min(1).max(320).default('Sagnex')
 });
 
-function firstHeaderValue(value: string | string[] | undefined) {
-  const firstValue = Array.isArray(value) ? value[0] : value;
-  return firstValue?.split(',')[0]?.trim().toLowerCase();
-}
-
-function isAllowedOrigin(origin: string | undefined, requestHost: string | undefined) {
-  if (!origin) return true;
-  if (/^https?:\/\/(?:127\.0\.0\.1|localhost):\d+$/.test(origin)) return true;
-  if (!requestHost) return false;
-
-  try {
-    return new URL(origin).host.toLowerCase() === requestHost;
-  } catch {
-    return false;
-  }
-}
-
 export function createApp(context: DatabaseContext, options: { fetcher?: typeof fetch; backupDirectory?: string } = {}) {
   const app = Fastify({ logger: false, bodyLimit: 25 * 1024 * 1024 });
   const store = new SagnexStore(context, { backupDirectory: options.backupDirectory });
   const webdav = new WebDavService(context, store, options.fetcher);
 
   app.register(cors, {
-    delegator: (request, callback) => {
-      const origin = request.headers.origin;
-      const requestHost = firstHeaderValue(request.headers.host);
-      if (isAllowedOrigin(origin, requestHost)) {
-        callback(null, { origin: true });
-        return;
-      }
-      callback(Object.assign(new Error('Origin not allowed'), { statusCode: 403 }));
+    origin: (origin, callback) => {
+      if (!origin || /^https?:\/\/(?:127\.0\.0\.1|localhost):\d+$/.test(origin)) callback(null, true);
+      else callback(Object.assign(new Error('Origin not allowed'), { statusCode: 403 }), false);
     }
   });
 

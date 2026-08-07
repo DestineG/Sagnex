@@ -1,6 +1,6 @@
 import type { Dependency, Task } from '@sagnex/contracts';
 import { describe, expect, it } from 'vitest';
-import { calculateEventStatus, canTransition, selectPreviewTaskIds, wouldCreateCycle } from './domain.js';
+import { calculateEventStatus, canTransition, getActiveTaskCounts, selectPreviewFocusTask, selectPreviewTaskIds, wouldCreateCycle } from './domain.js';
 
 const task = (id: string, status: Task['status'], updatedAt = '2026-01-01T00:00:00.000Z'): Task => ({
   id, eventId: '00000000-0000-4000-8000-000000000001', title: id, description: '', status,
@@ -26,6 +26,13 @@ describe('domain rules', () => {
     expect(canTransition('completed', 'in_progress')).toBe(true);
   });
 
+  it('counts running and paused tasks separately', () => {
+    expect(getActiveTaskCounts([task('a', 'in_progress'), task('b', 'paused'), task('c', 'in_progress'), task('d', 'completed')])).toEqual({
+      inProgressTasks: 2,
+      pausedTasks: 1
+    });
+  });
+
   it('rejects self links and cycles', () => {
     const edges = [dependency('a', 'b'), dependency('b', 'c')];
     expect(wouldCreateCycle(edges, 'c', 'a')).toBe(true);
@@ -33,27 +40,33 @@ describe('domain rules', () => {
     expect(wouldCreateCycle(edges, 'a', 'a')).toBe(true);
   });
 
-  it('focuses running tasks and falls back to graph tails', () => {
+  it('focuses a running task and falls back to the latest graph tail', () => {
     const tasks = [task('a', 'completed'), task('b', 'in_progress'), task('c', 'not_started'), task('d', 'not_started')];
     const edges = [dependency('a', 'b'), dependency('b', 'c'), dependency('c', 'd')];
-    expect([...selectPreviewTaskIds(tasks, edges, 3)]).toEqual(expect.arrayContaining(['a', 'b', 'c']));
+    expect(selectPreviewFocusTask(tasks, edges)?.id).toBe('b');
+    expect(selectPreviewTaskIds(tasks, edges)).toEqual(new Set(['a', 'b', 'c']));
     const withoutRunning = tasks.map((item) => ({ ...item, status: item.id === 'a' ? 'completed' as const : 'not_started' as const }));
-    expect([...selectPreviewTaskIds(withoutRunning, edges, 2)]).toEqual(expect.arrayContaining(['c', 'd']));
+    expect(selectPreviewFocusTask(withoutRunning, edges)?.id).toBe('d');
+    expect(selectPreviewTaskIds(withoutRunning, edges)).toEqual(new Set(['c', 'd']));
   });
 
   it('treats paused tasks as active preview focus', () => {
     const tasks = [task('a', 'not_started'), task('b', 'paused'), task('c', 'not_started'), task('d', 'not_started')];
     const dependencies = [dependency('a', 'b'), dependency('b', 'c')];
-    expect(selectPreviewTaskIds(tasks, dependencies, 3)).toEqual(new Set(['a', 'b', 'c']));
+    expect(selectPreviewTaskIds(tasks, dependencies)).toEqual(new Set(['a', 'b', 'c']));
   });
 
-  it('limits focused previews to the three most recently activated tasks', () => {
+  it('prioritizes the newest running task and includes every direct neighbor', () => {
     const tasks = [
-      task('a', 'in_progress', '2026-01-01T00:00:00.000Z'),
-      task('b', 'paused', '2026-01-02T00:00:00.000Z'),
-      task('c', 'in_progress', '2026-01-03T00:00:00.000Z'),
-      task('d', 'paused', '2026-01-04T00:00:00.000Z')
+      task('a', 'not_started'),
+      task('b', 'in_progress', '2026-01-03T00:00:00.000Z'),
+      task('c', 'completed'),
+      task('d', 'paused', '2026-01-04T00:00:00.000Z'),
+      task('e', 'not_started'),
+      task('f', 'not_started')
     ];
-    expect(selectPreviewTaskIds(tasks, [])).toEqual(new Set(['d', 'c', 'b']));
+    const dependencies = [dependency('a', 'b'), dependency('c', 'b'), dependency('b', 'e'), dependency('b', 'f')];
+    expect(selectPreviewFocusTask(tasks, dependencies)?.id).toBe('b');
+    expect(selectPreviewTaskIds(tasks, dependencies)).toEqual(new Set(['a', 'b', 'c', 'e', 'f']));
   });
 });

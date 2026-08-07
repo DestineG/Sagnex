@@ -23,7 +23,7 @@ describe('StatusOverviewGraph', () => {
     expect(container.querySelectorAll('.status-overview-node')).toHaveLength(4);
     expect(new Set([...container.querySelectorAll('.status-overview-node rect')].map((node) => node.getAttribute('fill'))).size).toBe(4);
     expect(container.querySelector('.status-overview-edges path')).toBeInTheDocument();
-    expect(container.querySelector('.status-overview-edges polygon')).toBeInTheDocument();
+    expect(container.querySelector('.status-overview-edges path')).toHaveAttribute('marker-end');
     expect(container.querySelector('text')).not.toBeInTheDocument();
     expect(screen.queryByText('不应显示')).not.toBeInTheDocument();
   });

@@ -52,7 +52,12 @@ test('renders active cards and editor across desktop and mobile', async ({ page,
   expect(activeCardBoxes.every((box) => box !== null)).toBe(true);
   expect(new Set(activeCardBoxes.map((box) => Math.round(box!.y))).size).toBe(1);
   await expect(page.getByText(/尚未完成的事件/)).toHaveCount(0);
-  await expect(page.locator('.event-card').filter({ hasText: eventTitle }).locator('.graph-edges path')).toHaveCount(2);
+  const activeCard = page.locator('.event-card').filter({ hasText: eventTitle });
+  await expect(activeCard.locator('.active-focus-node')).toHaveCount(1);
+  await expect(activeCard.locator('.active-compact-node')).toHaveCount(2);
+  await expect(activeCard.locator('.active-focus-edges path')).toHaveCount(2);
+  await expect(activeCard.getByLabel('1 个进行中任务')).toBeVisible();
+  await expect(activeCard.getByLabel('0 个暂停任务')).toBeVisible();
   const mainBox = await page.locator('.main-content').boundingBox();
   const actionsBox = await page.locator('.active-page-head .head-actions').boundingBox();
   expect(mainBox).not.toBeNull();

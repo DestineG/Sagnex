@@ -1,8 +1,8 @@
 import type { Dependency, Task, TaskStatus } from '@sagnex/contracts';
+import { useId } from 'react';
 import { taskStatusText } from '../api';
+import { FLOW_NODE_HEIGHT as EDITOR_NODE_HEIGHT, FLOW_NODE_WIDTH as EDITOR_NODE_WIDTH, getEditorEdgePath, GRAPH_EDGE_COLOR } from './taskNodeGeometry';
 
-const EDITOR_NODE_WIDTH = 208;
-const EDITOR_NODE_HEIGHT = 108;
 const NODE_WIDTH = 44;
 const NODE_HEIGHT = 26;
 const PADDING = 38;
@@ -16,15 +16,13 @@ const statusColors: Record<TaskStatus, { fill: string; stroke: string }> = {
   completed: { fill: '#4d93a6', stroke: '#28748f' }
 };
 
-interface Point { x: number; y: number }
-
 interface StatusOverviewGraphProps {
   tasks: Task[];
   dependencies: Dependency[];
   onTaskClick?: (taskId: string) => void;
 }
 
-function centerOf(task: Task): Point {
+function centerOf(task: Task) {
   return {
     x: task.positionX + EDITOR_NODE_WIDTH / 2,
     y: task.positionY + EDITOR_NODE_HEIGHT / 2
@@ -47,49 +45,29 @@ function graphBounds(tasks: Task[]) {
   };
 }
 
-function boundaryPoint(from: Point, to: Point): Point {
-  const dx = to.x - from.x;
-  const dy = to.y - from.y;
-  const scale = Math.max(Math.abs(dx) / (NODE_WIDTH / 2), Math.abs(dy) / (NODE_HEIGHT / 2), 1);
-  return { x: from.x + dx / scale, y: from.y + dy / scale };
-}
-
 function edgeGeometry(source: Task, target: Task) {
   const sourceCenter = centerOf(source);
   const targetCenter = centerOf(target);
-  const start = boundaryPoint(sourceCenter, targetCenter);
-  const end = boundaryPoint(targetCenter, sourceCenter);
-  const dx = end.x - start.x;
-  const dy = end.y - start.y;
-  const horizontal = Math.abs(dx) >= Math.abs(dy);
-  const controlA = horizontal ? { x: start.x + dx * 0.42, y: start.y } : { x: start.x, y: start.y + dy * 0.42 };
-  const controlB = horizontal ? { x: end.x - dx * 0.42, y: end.y } : { x: end.x, y: end.y - dy * 0.42 };
-  const angle = Math.atan2(end.y - controlB.y, end.x - controlB.x);
-  const size = 7;
-  const left = { x: end.x - Math.cos(angle - Math.PI / 6) * size, y: end.y - Math.sin(angle - Math.PI / 6) * size };
-  const right = { x: end.x - Math.cos(angle + Math.PI / 6) * size, y: end.y - Math.sin(angle + Math.PI / 6) * size };
-  return {
-    path: `M ${start.x} ${start.y} C ${controlA.x} ${controlA.y}, ${controlB.x} ${controlB.y}, ${end.x} ${end.y}`,
-    arrow: `${end.x},${end.y} ${left.x},${left.y} ${right.x},${right.y}`
-  };
+  return getEditorEdgePath(
+    { x: sourceCenter.x + NODE_WIDTH / 2, y: sourceCenter.y },
+    { x: targetCenter.x - NODE_WIDTH / 2, y: targetCenter.y }
+  );
 }
 
 export function StatusOverviewGraph({ tasks, dependencies, onTaskClick }: StatusOverviewGraphProps) {
+  const markerId = `${useId().replaceAll(':', '')}-status-arrow`;
   if (tasks.length === 0) return <div className="status-overview-graph empty" role="img" aria-label="暂无任务" />;
   const bounds = graphBounds(tasks);
   const taskMap = new Map(tasks.map((task) => [task.id, task]));
   return <div className="status-overview-graph">
     <svg viewBox={`${bounds.minX} ${bounds.minY} ${bounds.width} ${bounds.height}`} preserveAspectRatio="xMidYMid meet" role="img" aria-label="完整任务状态图">
+      <defs><marker id={markerId} markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="userSpaceOnUse"><path d="M 0 0 L 8 4 L 0 8 Z" fill={GRAPH_EDGE_COLOR} /></marker></defs>
       <g className="status-overview-edges">
         {dependencies.map((dependency) => {
           const source = taskMap.get(dependency.sourceTaskId);
           const target = taskMap.get(dependency.targetTaskId);
           if (!source || !target) return null;
-          const geometry = edgeGeometry(source, target);
-          return <g key={dependency.id}>
-            <path d={geometry.path} />
-            <polygon points={geometry.arrow} />
-          </g>;
+          return <path key={dependency.id} d={edgeGeometry(source, target)} markerEnd={`url(#${markerId})`} />;
         })}
       </g>
       <g className="status-overview-nodes">

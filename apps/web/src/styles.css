@@ -116,14 +116,21 @@ svg { width: 17px; height: 17px; flex: 0 0 auto; }
 .event-card-open { position: absolute; inset: 0; z-index: 1; border: 0; border-radius: 8px; background: transparent; cursor: pointer; }
 .event-card-open:focus-visible { outline: 2px solid var(--green); outline-offset: -3px; }
 .event-card-head, .event-card-foot { position: relative; z-index: 0; pointer-events: none; }
-.event-card-head { display: grid; grid-template-columns: minmax(0, 1fr) 92px; gap: 18px; min-height: 133px; padding: 14px 17px 13px; }
+.event-card-head { display: grid; grid-template-columns: minmax(0, 1fr) 104px; gap: 18px; min-height: 133px; padding: 14px 17px 13px; }
 .event-card-summary { min-width: 0; }
 .event-card-summary h2 { overflow: hidden; font-size: 16px; text-overflow: ellipsis; white-space: nowrap; }
 .event-card-summary > p { margin-top: 5px; overflow: hidden; color: var(--muted); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .event-card-tags { z-index: 2; margin-top: 8px; pointer-events: auto; }
-.event-card-progress { display: grid; align-content: start; justify-items: end; gap: 7px; min-width: 0; }
-.event-card-progress strong { color: var(--muted-strong); font-size: 12px; font-weight: 600; }
-.event-card-progress .progress { width: 74px; }
+.event-card-progress { display: grid; align-content: start; justify-items: end; gap: 8px; min-width: 0; }
+.active-task-counts { display: flex; align-items: center; justify-content: flex-end; gap: 14px; min-height: 20px; }
+.event-stat, .event-completion { display: inline-flex; align-items: center; gap: 5px; color: var(--muted-strong); white-space: nowrap; }
+.event-stat svg, .event-completion svg { width: 15px; height: 15px; }
+.event-stat strong, .event-completion strong { font-size: 12px; font-weight: 650; }
+.event-stat.running { color: var(--green-strong); }
+.event-stat.paused { color: var(--orange); }
+.event-stat.zero { color: var(--muted); opacity: .42; }
+.event-completion { color: var(--blue); }
+.event-card-progress .progress { width: 90px; }
 .event-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 38px; padding: 8px 17px; color: var(--muted); font-size: 12px; }
 .event-card-foot time { margin-left: auto; }
 .tag-row { display: flex; align-items: center; gap: 6px; margin-top: 11px; flex-wrap: wrap; }
@@ -152,6 +159,11 @@ svg { width: 17px; height: 17px; flex: 0 0 auto; }
 
 .mini-graph { position: relative; z-index: 2; display: grid; place-items: stretch; overflow: hidden; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--canvas); pointer-events: none; }
 .mini-graph-svg { width: 100%; height: 100%; }
+.active-focus-graph-svg { display: block; width: 100%; height: 100%; }
+.active-focus-node, .active-compact-node { cursor: pointer; pointer-events: all; }
+.active-focus-node:hover > rect:first-of-type, .active-focus-node:focus-visible > rect:first-of-type { stroke: #137a55; stroke-width: 3; }
+.active-compact-node:hover rect, .active-compact-node:focus-visible rect { filter: brightness(.92); stroke-width: 2; }
+.active-focus-node:focus-visible, .active-compact-node:focus-visible { outline: none; }
 .graph-node-action { cursor: pointer; pointer-events: all; }
 .graph-node-action:hover > g > rect:first-child, .graph-node-action:focus-visible > g > rect:first-child { stroke: #137a55; stroke-width: 3; }
 .graph-node-action:focus-visible { outline: none; }
@@ -208,7 +220,6 @@ svg { width: 17px; height: 17px; flex: 0 0 auto; }
 .status-overview-graph { position: relative; z-index: 2; display: grid; width: auto; min-width: 0; height: 120px; margin: 0 -17px; overflow: hidden; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: #f7f9f7; }
 .status-overview-graph svg { width: 100%; height: 100%; }
 .status-overview-edges path { fill: none; stroke: #9aa69f; stroke-width: 2; stroke-linecap: round; }
-.status-overview-edges polygon { fill: #9aa69f; }
 .status-overview-node { cursor: pointer; }
 .status-overview-node rect { stroke-width: 2; transition: filter 120ms ease, stroke-width 120ms ease; }
 .status-overview-node:hover rect, .status-overview-node:focus-visible rect { filter: brightness(.94); stroke-width: 3; }
@@ -520,21 +531,21 @@ fieldset.field { padding: 0; border: 0; }
 .history-list em { display: block; margin-top: 4px; color: var(--muted-strong); font-style: normal; line-height: 1.45; white-space: pre-wrap; }
 .history-list time { display: block; margin-top: 3px; color: var(--muted); }
 
-.task-node { position: relative; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; width: 208px; height: 108px; padding: 10px 12px 10px 14px; border: 1px solid var(--line-strong); border-left: 4px solid #758079; border-radius: 7px; background: var(--surface); box-shadow: 0 4px 12px rgb(26 43 33 / 7%); }
+.task-node { position: relative; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; width: 180px; height: 90px; padding: 8px 10px 8px 12px; border: 1px solid var(--line-strong); border-left: 4px solid #758079; border-radius: 7px; background: var(--surface); box-shadow: 0 4px 12px rgb(26 43 33 / 7%); }
 .task-node.selected { outline: 2px solid var(--green); outline-offset: 3px; }
 .task-node strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.task-node > p { display: -webkit-box; margin-top: 3px; overflow: hidden; color: var(--muted); font-size: 12px; line-height: 1.35; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
-.task-node-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; align-self: end; margin-top: 6px; color: var(--muted-strong); font-size: 12px; }
+.task-node > p { display: -webkit-box; margin-top: 2px; overflow: hidden; color: var(--muted); font-size: 11px; line-height: 1.3; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 1; }
+.task-node-foot { display: flex; align-items: center; justify-content: space-between; gap: 7px; align-self: end; margin-top: 4px; color: var(--muted-strong); font-size: 11px; }
 .task-node-foot > span { display: flex; align-items: center; gap: 7px; }
-.task-node-foot svg { width: 16px; height: 16px; }
-.task-node-foot time { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.task-node-foot svg { width: 14px; height: 14px; }
+.task-node-foot time { color: var(--muted); font-size: 10px; white-space: nowrap; }
 .task-node.status-in_progress { border-color: #76b79c; border-left-color: var(--green); background: #f1faf5; }
 .task-node.status-in_progress .task-node-foot > span { color: var(--green-strong); }
 .task-node.status-paused { border-color: #dfb171; border-left-color: var(--orange); background: #fff9ef; }
 .task-node.status-paused .task-node-foot > span { color: var(--orange); }
 .task-node.status-completed { border-color: #89bdca; border-left-color: var(--blue); background: #f0f8fa; }
 .task-node.status-completed .task-node-foot > span { color: var(--blue); }
-.react-flow__handle { width: 10px; height: 10px; border: 2px solid var(--surface); background: #69756e; }
+.react-flow__handle { width: 9px; height: 9px; border: 2px solid var(--surface); background: #69756e; }
 .react-flow__edge-path { stroke: #829087; stroke-width: 1.8; }
 .react-flow__edge.selected .react-flow__edge-path { stroke: var(--green); stroke-width: 2.4; }
 .react-flow__background { color: #d4ddd7; }

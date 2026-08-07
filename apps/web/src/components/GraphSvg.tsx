@@ -1,9 +1,9 @@
 import type { Dependency, Task, TaskStatus } from '@sagnex/contracts';
+import { useId } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { formatStatusDate, taskStatusText } from '../api';
+import { FLOW_NODE_HEIGHT as NODE_HEIGHT, FLOW_NODE_WIDTH as NODE_WIDTH, getEditorEdgePath, GRAPH_EDGE_COLOR, GRAPH_EDGE_WIDTH } from './taskNodeGeometry';
 
-const NODE_WIDTH = 208;
-const NODE_HEIGHT = 108;
 const PADDING = 44;
 
 const statusColors: Record<TaskStatus, { accent: string; border: string; fill: string; text: string }> = {
@@ -12,8 +12,6 @@ const statusColors: Record<TaskStatus, { accent: string; border: string; fill: s
   paused: { accent: '#b56714', border: '#d9a35d', fill: '#fff8ec', text: '#92500d' },
   completed: { accent: '#28748f', border: '#71aebe', fill: '#eef8fa', text: '#1f657b' }
 };
-
-interface Point { x: number; y: number }
 
 interface GraphSvgProps {
   tasks: Task[];
@@ -34,31 +32,11 @@ function boundsFor(tasks: Task[]) {
   return { minX, minY, width: Math.max(maxX - minX, 360), height: Math.max(maxY - minY, 176) };
 }
 
-function boundaryPoint(from: Point, to: Point): Point {
-  const dx = to.x - from.x;
-  const dy = to.y - from.y;
-  const scale = Math.max(Math.abs(dx) / (NODE_WIDTH / 2), Math.abs(dy) / (NODE_HEIGHT / 2), 1);
-  return { x: from.x + dx / scale, y: from.y + dy / scale };
-}
-
 function edgeGeometry(source: Task, target: Task) {
-  const sourceCenter = { x: source.positionX + NODE_WIDTH / 2, y: source.positionY + NODE_HEIGHT / 2 };
-  const targetCenter = { x: target.positionX + NODE_WIDTH / 2, y: target.positionY + NODE_HEIGHT / 2 };
-  const start = boundaryPoint(sourceCenter, targetCenter);
-  const end = boundaryPoint(targetCenter, sourceCenter);
-  const dx = end.x - start.x;
-  const dy = end.y - start.y;
-  const horizontal = Math.abs(dx) >= Math.abs(dy);
-  const controlA = horizontal ? { x: start.x + dx * 0.44, y: start.y } : { x: start.x, y: start.y + dy * 0.44 };
-  const controlB = horizontal ? { x: end.x - dx * 0.44, y: end.y } : { x: end.x, y: end.y - dy * 0.44 };
-  const angle = Math.atan2(end.y - controlB.y, end.x - controlB.x);
-  const size = 8;
-  const left = { x: end.x - Math.cos(angle - Math.PI / 6) * size, y: end.y - Math.sin(angle - Math.PI / 6) * size };
-  const right = { x: end.x - Math.cos(angle + Math.PI / 6) * size, y: end.y - Math.sin(angle + Math.PI / 6) * size };
-  return {
-    path: `M ${start.x} ${start.y} C ${controlA.x} ${controlA.y}, ${controlB.x} ${controlB.y}, ${end.x} ${end.y}`,
-    arrow: `${end.x},${end.y} ${left.x},${left.y} ${right.x},${right.y}`
-  };
+  return getEditorEdgePath(
+    { x: source.positionX + NODE_WIDTH, y: source.positionY + NODE_HEIGHT / 2 },
+    { x: target.positionX, y: target.positionY + NODE_HEIGHT / 2 }
+  );
 }
 
 function StatusGlyph({ status, x, y }: { status: TaskStatus; x: number; y: number }) {
@@ -96,6 +74,7 @@ export function truncateSvgText(value: string, maxWidth: number, fontSize: numbe
 }
 
 export function GraphSvg({ tasks, dependencies, className, width, height, interactive = false, showGrid = true, onTaskClick }: GraphSvgProps) {
+  const markerId = `${useId().replaceAll(':', '')}-graph-arrow`;
   if (tasks.length === 0) return null;
   const bounds = boundsFor(tasks);
   const taskMap = new Map(tasks.map((task) => [task.id, task]));
@@ -111,6 +90,7 @@ export function GraphSvg({ tasks, dependencies, className, width, height, intera
   >
     <defs>
       <pattern id="sagnex-grid" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="1" fill="#dbe2dd" /></pattern>
+      <marker id={markerId} markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto" markerUnits="userSpaceOnUse"><path d="M 0 0 L 9 4.5 L 0 9 Z" fill={GRAPH_EDGE_COLOR} /></marker>
       {tasks.map((task) => <clipPath id={`task-text-${task.id}`} key={task.id}>
         <rect x={task.positionX + 18} y={task.positionY + 9} width={NODE_WIDTH - 34} height="49" />
       </clipPath>)}
@@ -122,11 +102,7 @@ export function GraphSvg({ tasks, dependencies, className, width, height, intera
         const source = taskMap.get(dependency.sourceTaskId);
         const target = taskMap.get(dependency.targetTaskId);
         if (!source || !target) return null;
-        const geometry = edgeGeometry(source, target);
-        return <g key={dependency.id}>
-          <path d={geometry.path} fill="none" stroke="#87928b" strokeWidth="2" strokeLinecap="round" />
-          <polygon points={geometry.arrow} fill="#87928b" />
-        </g>;
+        return <path key={dependency.id} d={edgeGeometry(source, target)} fill="none" stroke={GRAPH_EDGE_COLOR} strokeWidth={GRAPH_EDGE_WIDTH} strokeLinecap="round" markerEnd={`url(#${markerId})`} />;
       })}
     </g>
     <g className="graph-nodes">
@@ -137,9 +113,9 @@ export function GraphSvg({ tasks, dependencies, className, width, height, intera
           <rect x={task.positionX} y={task.positionY} width="5" height={NODE_HEIGHT} rx="2.5" fill={palette.accent} />
           <text clipPath={`url(#task-text-${task.id})`} x={task.positionX + 18} y={task.positionY + 27} fill="#1f2923" fontFamily="Segoe UI, Microsoft YaHei, sans-serif" fontSize="15" fontWeight="600">{truncateSvgText(task.title, NODE_WIDTH - 36, 15)}</text>
           {task.description && <text clipPath={`url(#task-text-${task.id})`} x={task.positionX + 18} y={task.positionY + 51} fill="#69756e" fontFamily="Segoe UI, Microsoft YaHei, sans-serif" fontSize="11">{truncateSvgText(task.description, NODE_WIDTH - 36, 11)}</text>}
-          <StatusGlyph status={task.status} x={task.positionX + 19} y={task.positionY + 82} />
-          <text x={task.positionX + 37} y={task.positionY + 87} fill={palette.text} fontFamily="Segoe UI, Microsoft YaHei, sans-serif" fontSize="12">{taskStatusText[task.status]}</text>
-          <text x={task.positionX + NODE_WIDTH - 16} y={task.positionY + 87} textAnchor="end" fill="#69756e" fontFamily="Segoe UI, Microsoft YaHei, sans-serif" fontSize="10">{formatStatusDate(task.statusChangedAt)}</text>
+          <StatusGlyph status={task.status} x={task.positionX + 19} y={task.positionY + NODE_HEIGHT - 20} />
+          <text x={task.positionX + 37} y={task.positionY + NODE_HEIGHT - 15} fill={palette.text} fontFamily="Segoe UI, Microsoft YaHei, sans-serif" fontSize="12">{taskStatusText[task.status]}</text>
+          <text x={task.positionX + NODE_WIDTH - 16} y={task.positionY + NODE_HEIGHT - 15} textAnchor="end" fill="#69756e" fontFamily="Segoe UI, Microsoft YaHei, sans-serif" fontSize="10">{formatStatusDate(task.statusChangedAt)}</text>
         </g>;
         if (!interactive) return <g key={task.id}>{node}</g>;
         return <g

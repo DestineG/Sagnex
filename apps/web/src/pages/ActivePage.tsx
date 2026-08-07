@@ -1,12 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toBlob } from 'html-to-image';
-import { Download, Plus } from 'lucide-react';
+import { CircleCheck, CirclePlay, Download, PauseCircle, Plus } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api, downloadBlob, eventStatusText, exportStamp, formatDate } from '../api';
+import { api, downloadBlob, exportStamp, formatDate } from '../api';
+import { ActiveFocusGraph } from '../components/ActiveFocusGraph';
 import { EventFormDialog } from '../components/EventFormDialog';
 import { EventTagSummary } from '../components/EventTagSummary';
-import { MiniGraph } from '../components/MiniGraph';
 
 export function ActivePage() {
   const navigate = useNavigate();
@@ -73,12 +73,15 @@ export function ActivePage() {
                 <EventTagSummary labels={event.labels} className="event-card-tags" onOpen={() => navigate(`/events/${event.id}`, { state: { returnTo: '/' } })} />
               </div>
               <div className="event-card-progress">
-                <span className={`status-badge status-${event.status}`}>{eventStatusText[event.status]}</span>
-                <strong>{event.completedTasks} / {event.totalTasks}</strong>
+                <div className="active-task-counts">
+                  <span className={event.inProgressTasks === 0 ? 'event-stat running zero' : 'event-stat running'} aria-label={`${event.inProgressTasks} 个进行中任务`}><CirclePlay /><strong>{event.inProgressTasks}</strong></span>
+                  <span className={event.pausedTasks === 0 ? 'event-stat paused zero' : 'event-stat paused'} aria-label={`${event.pausedTasks} 个暂停任务`}><PauseCircle /><strong>{event.pausedTasks}</strong></span>
+                </div>
+                <span className="event-completion" aria-label={`完成 ${event.completedTasks} / ${event.totalTasks}`}><CircleCheck /><strong>{event.completedTasks} / {event.totalTasks}</strong></span>
                 <span className="progress"><i style={{ width: `${event.totalTasks ? (event.completedTasks / event.totalTasks) * 100 : 0}%` }} /></span>
               </div>
             </div>
-            <MiniGraph tasks={event.previewTasks} dependencies={event.previewDependencies} onTaskClick={(taskId) => navigate(`/events/${event.id}?task=${taskId}`, { state: { returnTo: '/' } })} />
+            <ActiveFocusGraph tasks={event.previewTasks} dependencies={event.previewDependencies} focusTaskId={event.previewFocusTaskId} onTaskClick={(taskId) => navigate(`/events/${event.id}?task=${taskId}`, { state: { returnTo: '/' } })} />
             <footer className="event-card-foot"><span>最近更新</span><time>{formatDate(event.updatedAt)}</time></footer>
           </article>)}
         </div>

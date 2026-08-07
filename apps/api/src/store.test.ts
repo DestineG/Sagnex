@@ -82,6 +82,8 @@ describe('SagnexStore', () => {
     expect((await store.getEvent(creating.id)).status).toBe('ready');
     expect((await store.getEvent(running.id)).status).toBe('in_progress');
     expect((await store.getEvent(paused.id)).status).toBe('paused');
+    expect(await store.getEvent(running.id)).toMatchObject({ inProgressTasks: 1, pausedTasks: 0, previewFocusTaskId: runningTask.id });
+    expect(await store.getEvent(paused.id)).toMatchObject({ inProgressTasks: 0, pausedTasks: 1, previewFocusTaskId: pausedTask.id });
     expect((await store.getEvent(betweenSteps.id)).status).toBe('awaiting_progress');
     await store.setArchived(running.id, true);
     expect((await store.listEvents({ active: true })).map((event) => event.title)).toEqual(['已暂停']);
@@ -95,7 +97,8 @@ describe('SagnexStore', () => {
 
     const focused = (await store.listEvents()).find((item) => item.id === event.id)!;
     const full = (await store.listEvents({ preview: 'full' })).find((item) => item.id === event.id)!;
-    expect(focused.previewTasks).toHaveLength(3);
+    expect(focused.previewTasks).toHaveLength(1);
+    expect(focused.previewFocusTaskId).not.toBeNull();
     expect(full.previewTasks).toHaveLength(10);
   });
 

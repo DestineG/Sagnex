@@ -101,8 +101,11 @@ export const eventSummarySchema = z.object({
   createdAt: z.string(),
   updatedAt: z.string(),
   completedTasks: z.number().int().nonnegative(),
+  inProgressTasks: z.number().int().nonnegative(),
+  pausedTasks: z.number().int().nonnegative(),
   totalTasks: z.number().int().nonnegative(),
   labels: z.array(labelSchema),
+  previewFocusTaskId: z.string().uuid().nullable().default(null),
   previewTasks: z.array(taskSchema).default([]),
   previewDependencies: z.array(dependencySchema).default([])
 });

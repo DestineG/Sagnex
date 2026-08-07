@@ -25,7 +25,7 @@ import { and, asc, count, desc, eq, inArray } from 'drizzle-orm';
 import { mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { DatabaseContext } from './database.js';
-import { calculateEventStatus, canTransition, getProgress, selectPreviewTaskIds, wouldCreateCycle } from './domain.js';
+import { calculateEventStatus, canTransition, getActiveTaskCounts, getProgress, selectPreviewFocusTask, selectPreviewTaskIds, wouldCreateCycle } from './domain.js';
 import { InvalidLabelIconError, sanitizeLabelIcon } from './label-icon.js';
 import { dependencies, eventLabels, events, labels, stateChanges, taskComments, tasks } from './schema.js';
 
@@ -141,6 +141,8 @@ export class SagnexStore {
       const eventLabelRows = labelRows.filter((label) => ids.has(label.id));
       const status = calculateEventStatus(eventTasks);
       const progress = getProgress(eventTasks);
+      const activeCounts = getActiveTaskCounts(eventTasks);
+      const previewFocus = selectPreviewFocusTask(eventTasks, eventDependencies);
       const previewIds = filters.preview === 'full'
         ? new Set(eventTasks.map((task) => task.id))
         : selectPreviewTaskIds(eventTasks, eventDependencies);
@@ -148,7 +150,9 @@ export class SagnexStore {
         ...event,
         status,
         ...progress,
+        ...activeCounts,
         labels: eventLabelRows,
+        previewFocusTaskId: previewFocus?.id ?? null,
         previewTasks: eventTasks.filter((task) => previewIds.has(task.id)),
         previewDependencies: eventDependencies.filter((edge) => previewIds.has(edge.sourceTaskId) && previewIds.has(edge.targetTaskId))
       } satisfies EventSummary;

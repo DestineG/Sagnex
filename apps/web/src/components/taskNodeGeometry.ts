@@ -1,5 +1,9 @@
-export const FLOW_NODE_WIDTH = 208;
-export const FLOW_NODE_HEIGHT = 108;
+import { getBezierPath, Position } from '@xyflow/react';
+
+export const FLOW_NODE_WIDTH = 180;
+export const FLOW_NODE_HEIGHT = 90;
+export const GRAPH_EDGE_COLOR = '#829087';
+export const GRAPH_EDGE_WIDTH = 1.8;
 
 export interface FlowPosition {
   x: number;
@@ -9,6 +13,17 @@ export interface FlowPosition {
 export interface FlowViewportBounds extends FlowPosition {
   width: number;
   height: number;
+}
+
+export function getEditorEdgePath(source: FlowPosition, target: FlowPosition): string {
+  return getBezierPath({
+    sourceX: source.x,
+    sourceY: source.y,
+    sourcePosition: Position.Right,
+    targetX: target.x,
+    targetY: target.y,
+    targetPosition: Position.Left
+  })[0];
 }
 
 interface PositionedNode {

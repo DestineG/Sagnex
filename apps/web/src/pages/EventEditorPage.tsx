@@ -1,4 +1,4 @@
-import type { EventGraph, Label, StateChange, Task, TaskComment, TaskStatus } from '@sagnex/contracts';
+import type { CopyEventInput, EventGraph, Label, StateChange, Task, TaskComment, TaskStatus } from '@sagnex/contracts';
 import dagre from '@dagrejs/dagre';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -6,14 +6,16 @@ import {
   useEdgesState, useNodesState, useReactFlow, useViewport,
   type Connection, type Edge, type Node, type NodeProps
 } from '@xyflow/react';
-import { Archive, ArchiveRestore, ArrowLeft, Check, CheckCircle2, ChevronDown, Circle, CirclePlay, Download, FileJson, ImageDown, LayoutTemplate, Maximize2, Pause, PauseCircle, Play, Plus, Send, Trash2 } from 'lucide-react';
+import { Archive, ArchiveRestore, ArrowLeft, Check, CheckCircle2, ChevronDown, Circle, CirclePlay, Copy, Download, FileJson, ImageDown, LayoutTemplate, Maximize2, MoreHorizontal, Pause, PauseCircle, Play, Plus, Send, Trash2 } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ApiError, api, downloadBlob, downloadJson, eventStatusText, exportStamp, formatDate, formatStatusDate, taskStatusText } from '../api';
+import { CopyEventDialog } from '../components/CopyEventDialog';
 import { Dialog } from '../components/Dialog';
 import { graphPngBlob } from '../components/GraphSvg';
 import { LabelPicker } from '../components/LabelPicker';
 import { createMiniMapBounds, expandMiniMapBounds, type WorldBounds } from '../components/canvasMiniMapGeometry';
+import { findFreeTaskPosition, FLOW_NODE_HEIGHT, FLOW_NODE_WIDTH } from '../components/taskNodeGeometry';
 
 type TaskNodeData = { title: string; description: string; status: TaskStatus; statusChangedAt: string; archived: boolean };
 type TaskFlowNode = Node<TaskNodeData, 'task'>;
@@ -33,8 +35,6 @@ function TaskNode({ data, selected }: NodeProps<TaskFlowNode>) {
 }
 
 const nodeTypes = { task: TaskNode };
-const FLOW_NODE_WIDTH = 208;
-const FLOW_NODE_HEIGHT = 108;
 const miniMapColors: Record<TaskStatus, string> = {
   not_started: '#dce4df',
   in_progress: '#78c7a4',
@@ -325,17 +325,21 @@ function TaskInspector({ graph, task, history, comments, onUpdate, onTransition,
   </div>;
 }
 
-function Editor({ graph, labels, onExportJson, onArchive, onRestoreEvent }: { graph: EventGraph; labels: Label[]; onExportJson: () => void; onArchive: () => void; onRestoreEvent: () => void }) {
+function Editor({ graph, labels, onExportJson, onArchive, onRestoreEvent, onCopy }: { graph: EventGraph; labels: Label[]; onExportJson: () => void; onArchive: () => void; onRestoreEvent: () => void; onCopy: (input: CopyEventInput) => Promise<void> }) {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedTaskId = searchParams.get('task');
   const [exportOpen, setExportOpen] = useState(false);
+  const [eventActionsOpen, setEventActionsOpen] = useState(false);
+  const [copyOpen, setCopyOpen] = useState(false);
   const [taskDialog, setTaskDialog] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState('');
   const flowCanvasRef = useRef<HTMLDivElement>(null);
   const [canvasSize, setCanvasSize] = useState({ width: 1, height: 1 });
-  const { fitView } = useReactFlow();
+  const { fitView, setCenter } = useReactFlow();
+  const viewport = useViewport();
+  const centeredTaskId = useRef<string | null>(null);
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey: ['event', graph.id] });
     await queryClient.invalidateQueries({ queryKey: ['events'] });
@@ -349,7 +353,19 @@ function Editor({ graph, labels, onExportJson, onArchive, onRestoreEvent }: { gr
   useEffect(() => setNodes(mappedNodes), [mappedNodes, setNodes]);
   useEffect(() => setNodes((current) => current.map((node) => ({ ...node, selected: node.id === selectedTaskId }))), [mappedNodes, selectedTaskId, setNodes]);
   useEffect(() => setEdges(mappedEdges), [mappedEdges, setEdges]);
-  useEffect(() => { if (selectedTaskId) window.setTimeout(() => void fitView({ nodes: [{ id: selectedTaskId }], padding: 1.2, duration: 250, maxZoom: 1.25 }), 50); }, [fitView, selectedTaskId]);
+  useEffect(() => {
+    if (!selectedTaskId) {
+      centeredTaskId.current = null;
+      return;
+    }
+    const task = visibleTasks.find((item) => item.id === selectedTaskId);
+    if (!task || centeredTaskId.current === task.id) return;
+    centeredTaskId.current = task.id;
+    void setCenter(task.positionX + FLOW_NODE_WIDTH / 2, task.positionY + FLOW_NODE_HEIGHT / 2, {
+      zoom: Math.min(1.2, Math.max(0.9, viewport.zoom)),
+      duration: 250
+    });
+  }, [selectedTaskId, setCenter, viewport.zoom, visibleTasks]);
   useLayoutEffect(() => {
     const element = flowCanvasRef.current;
     if (!element) return;
@@ -363,7 +379,28 @@ function Editor({ graph, labels, onExportJson, onArchive, onRestoreEvent }: { gr
   const selectedTask = graph.tasks.find((task) => task.id === selectedTaskId);
   const { data: history = [] } = useQuery({ queryKey: ['task-history', selectedTaskId], queryFn: () => api.getTaskHistory(selectedTaskId!), enabled: Boolean(selectedTaskId) });
   const { data: comments = [] } = useQuery({ queryKey: ['task-comments', selectedTaskId], queryFn: () => api.listTaskComments(selectedTaskId!), enabled: Boolean(selectedTaskId) });
-  const createTask = useMutation({ mutationFn: (value: { title: string; description: string }) => api.createTask(graph.id, { ...value, positionX: 80 + (graph.tasks.length % 4) * 233, positionY: 100 + Math.floor(graph.tasks.length / 4) * 138 }), onSuccess: async (task) => { setTaskDialog(false); await refresh(); setSearchParams({ task: task.id }); } });
+  const createTask = useMutation({
+    mutationFn: (value: { title: string; description: string }) => {
+      const visibleBounds = {
+        x: -viewport.x / viewport.zoom,
+        y: -viewport.y / viewport.zoom,
+        width: canvasSize.width / viewport.zoom,
+        height: canvasSize.height / viewport.zoom
+      };
+      const position = findFreeTaskPosition(
+        { x: visibleBounds.x + visibleBounds.width / 2, y: visibleBounds.y + visibleBounds.height / 2 },
+        nodes,
+        visibleBounds
+      );
+      return api.createTask(graph.id, { ...value, positionX: position.x, positionY: position.y });
+    },
+    onSuccess: async (task) => {
+      setTaskDialog(false);
+      await refresh();
+      centeredTaskId.current = null;
+      setSearchParams({ task: task.id });
+    }
+  });
   const updateEvent = useMutation({ mutationFn: (value: { title?: string; description?: string; labelIds?: string[] }) => api.updateEvent(graph.id, value), onSuccess: refresh, onError: (cause) => setError(cause.message) });
   const updateTask = useMutation({ mutationFn: ({ id, value }: { id: string; value: { title?: string; description?: string } }) => api.updateTask(id, value), onSuccess: refresh, onError: (cause) => setError(cause.message) });
   const transition = useMutation({ mutationFn: ({ id, status, confirmed = false, comment }: { id: string; status: TaskStatus; confirmed?: boolean; comment: string; afterSuccess: () => void }) => api.transitionTask(id, status, confirmed, comment), onSuccess: async (_result, variables) => { variables.afterSuccess(); await refresh(); if (selectedTaskId) await queryClient.invalidateQueries({ queryKey: ['task-history', selectedTaskId] }); }, onError: async (cause, variables) => {
@@ -435,9 +472,15 @@ function Editor({ graph, labels, onExportJson, onArchive, onRestoreEvent }: { gr
         </div>}
       </div>
       <div className="commandbar-spacer" />
-      {graph.archivedAt
-        ? <button className="button" type="button" onClick={onRestoreEvent}><ArchiveRestore />恢复事件</button>
-        : <button className="button" type="button" onClick={onArchive}><Archive />归档事件</button>}
+      <div className="command-menu-wrap align-right">
+        <button className={eventActionsOpen ? 'button active' : 'button'} type="button" onClick={() => setEventActionsOpen((value) => !value)} aria-expanded={eventActionsOpen}><MoreHorizontal />事件操作<ChevronDown /></button>
+        {eventActionsOpen && <div className="command-menu">
+          <button type="button" onClick={() => { setEventActionsOpen(false); setCopyOpen(true); }}><Copy />复制事件</button>
+          {graph.archivedAt
+            ? <button type="button" onClick={() => { setEventActionsOpen(false); onRestoreEvent(); }}><ArchiveRestore />恢复事件</button>
+            : <button type="button" onClick={() => { setEventActionsOpen(false); onArchive(); }}><Archive />归档事件</button>}
+        </div>}
+      </div>
     </div>
     <div className="editor-body">
     <div className="flow-column">
@@ -461,6 +504,7 @@ function Editor({ graph, labels, onExportJson, onArchive, onRestoreEvent }: { gr
       {selectedTask ? <TaskInspector key={selectedTask.id} graph={graph} task={selectedTask} history={history} comments={comments} onUpdate={(value) => updateTask.mutate({ id: selectedTask.id, value })} onTransition={(status, comment, afterSuccess) => transition.mutate({ id: selectedTask.id, status, comment, afterSuccess })} onCreateComment={(content, afterSuccess) => createComment.mutate({ taskId: selectedTask.id, content, afterSuccess })} onDeleteComment={(id) => { if (window.confirm('删除这条任务评论？')) removeComment.mutate(id); }} onSelectTask={(id) => setSearchParams({ task: id })} transitionPending={transition.isPending} commentPending={createComment.isPending} onDelete={() => { if (window.confirm('永久删除这个任务？任务历史、评论和相关依赖也会一并删除。')) removeTask.mutate(selectedTask.id); }} /> : <EventInspector key={graph.id} graph={graph} labels={labels} onUpdate={(value) => updateEvent.mutate(value)} />}
     </aside>
     {taskDialog && <TaskDialog onClose={() => setTaskDialog(false)} onCreate={(value) => createTask.mutateAsync(value).then(() => undefined)} />}
+    {copyOpen && <CopyEventDialog sourceTitle={graph.title} onClose={() => setCopyOpen(false)} onCopy={onCopy} />}
     <div className="sr-only" aria-live="polite">{updateEvent.isPending || updateTask.isPending ? '正在保存' : '已保存'}</div>
     </div>
   </div>;
@@ -478,6 +522,7 @@ export function EventEditorPage() {
   const refresh = async () => { await queryClient.invalidateQueries({ queryKey: ['event', eventId] }); await queryClient.invalidateQueries({ queryKey: ['events'] }); };
   const archive = useMutation({ mutationFn: () => api.archiveEvent(eventId), onSuccess: refresh });
   const restore = useMutation({ mutationFn: () => api.restoreEvent(eventId), onSuccess: refresh });
+  const copyEvent = useMutation({ mutationFn: (input: CopyEventInput) => api.copyEvent(eventId, input), onSuccess: async (copied) => { await queryClient.invalidateQueries({ queryKey: ['events'] }); navigate(`/events/${copied.id}`, { state: { returnTo } }); } });
   async function exportEventJson() { if (graph) downloadJson(`sagnex-${graph.title}-${exportStamp()}.json`, await api.exportEvent(graph.id)); }
   if (isLoading) return <div className="empty-state">正在加载事件...</div>;
   if (error || !graph) return <div className="empty-state"><h2>无法打开事件</h2><p>{error?.message}</p><button className="button" onClick={() => navigate('/events')}>返回事件列表</button></div>;
@@ -490,7 +535,7 @@ export function EventEditorPage() {
     </header>
     <div className={graph.archivedAt ? 'editor-workspace archived' : 'editor-workspace'}>
       {graph.archivedAt && <div className="archive-banner">该事件已归档，恢复后才能编辑。</div>}
-      <ReactFlowProvider><Editor graph={graph} labels={labels} onExportJson={() => void exportEventJson()} onArchive={() => archive.mutate()} onRestoreEvent={() => restore.mutate()} /></ReactFlowProvider>
+      <ReactFlowProvider><Editor graph={graph} labels={labels} onExportJson={() => void exportEventJson()} onArchive={() => archive.mutate()} onRestoreEvent={() => restore.mutate()} onCopy={(input) => copyEvent.mutateAsync(input).then(() => undefined)} /></ReactFlowProvider>
     </div>
   </section>;
 }

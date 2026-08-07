@@ -1,6 +1,40 @@
 import { expect, test } from '@playwright/test';
 import { stat } from 'node:fs/promises';
 
+test('creates a deep event copy from the event actions menu', async ({ page, request }) => {
+  const suffix = Date.now().toString().slice(-6);
+  const sourceTitle = `复制来源-${suffix}`;
+  const copiedTitle = `拆分副本-${suffix}`;
+  const created = await request.post('/api/events', { data: { title: sourceTitle, description: '复制简介', labelIds: [] } });
+  const source = await created.json();
+  const taskResponse = await request.post(`/api/events/${source.id}/tasks`, { data: { title: '保留进度', description: '', positionX: 40, positionY: 80 } });
+  const task = await taskResponse.json();
+  await request.post(`/api/tasks/${task.id}/transition`, { data: { toStatus: 'in_progress', confirmSoftDependencies: false, comment: '深拷贝状态备注' } });
+  await request.post(`/api/tasks/${task.id}/comments`, { data: { content: '深拷贝任务评论' } });
+
+  await page.goto(`/events/${source.id}`);
+  await page.getByRole('button', { name: '事件操作' }).click();
+  await page.getByRole('button', { name: '复制事件' }).click();
+  await page.getByLabel('副本标题').fill(copiedTitle);
+  await page.getByRole('radio', { name: /深拷贝/ }).check();
+  const copyResponse = page.waitForResponse((response) => response.url().endsWith(`/api/events/${source.id}/copy`) && response.request().method() === 'POST');
+  await page.getByRole('button', { name: '创建副本' }).click();
+  const copiedFromResponse = await (await copyResponse).json();
+  const copiedId = copiedFromResponse.id as string;
+  expect(copiedId).not.toBe(source.id);
+  await expect(page).toHaveURL(new RegExp(`/events/${copiedId}$`));
+  const copied = await (await request.get(`/api/events/${copiedId}`)).json();
+  expect(copied).toMatchObject({ title: copiedTitle, description: '复制简介', archivedAt: null });
+  expect(copied.tasks).toHaveLength(1);
+  expect(copied.tasks[0]).toMatchObject({ title: '保留进度', status: 'in_progress', positionX: 40, positionY: 80 });
+  expect(await (await request.get(`/api/tasks/${copied.tasks[0].id}/history`)).json()).toEqual([
+    expect.objectContaining({ comment: '深拷贝状态备注' })
+  ]);
+  expect(await (await request.get(`/api/tasks/${copied.tasks[0].id}/comments`)).json()).toEqual([
+    expect.objectContaining({ content: '深拷贝任务评论' })
+  ]);
+});
+
 test('completes the local event workflow', async ({ page, request }) => {
   const suffix = Date.now().toString().slice(-6);
   const labelName = `测试-${suffix}`;
@@ -101,6 +135,7 @@ test('completes the local event workflow', async ({ page, request }) => {
   await expect(page).toHaveURL(/\/$/);
   await activeCard.getByRole('button', { name: '后续任务，进行中' }).click();
   const archiveResponse = page.waitForResponse((response) => response.url().endsWith(`/api/events/${eventId}/archive`));
+  await page.getByRole('button', { name: '事件操作' }).click();
   await page.getByRole('button', { name: '归档事件' }).click();
   const archived = await archiveResponse;
   expect(archived.status(), await archived.text()).toBe(200);

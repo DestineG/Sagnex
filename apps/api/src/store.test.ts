@@ -28,6 +28,38 @@ describe('SagnexStore', () => {
     expect(await store.getTaskHistory(task.id)).toHaveLength(2);
   });
 
+  it('creates shallow planning copies and deep history copies', async () => {
+    const label = await store.createLabel({ name: '模板', color: '#176b4b' });
+    const source = await store.createEvent({ title: '源事件', description: '保留简介', labelIds: [label.id] });
+    const first = await store.createTask(source.id, { title: '第一步', description: '任务简介', positionX: 40, positionY: 80 });
+    const second = await store.createTask(source.id, { title: '第二步', description: '', positionX: 320, positionY: 80 });
+    await store.createDependency(source.id, { sourceTaskId: first.id, targetTaskId: second.id });
+    await store.transitionTask(first.id, 'in_progress', false, '开始执行');
+    await store.createTaskComment(first.id, { content: '保留评论' });
+
+    const shallow = await store.copyEvent(source.id, { title: '浅副本', mode: 'shallow' });
+    expect(shallow).toMatchObject({ title: '浅副本', description: '保留简介', archivedAt: null });
+    expect(shallow.labels.map((item) => item.id)).toEqual([label.id]);
+    expect(shallow.tasks).toHaveLength(2);
+    expect(shallow.tasks.every((task) => task.status === 'not_started')).toBe(true);
+    expect(shallow.tasks.map((task) => [task.positionX, task.positionY])).toEqual([[40, 80], [320, 80]]);
+    expect(shallow.tasks.some((task) => task.id === first.id || task.id === second.id)).toBe(false);
+    expect(shallow.dependencies).toHaveLength(1);
+    expect(await store.getTaskHistory(shallow.tasks[0]!.id)).toEqual([]);
+    expect(await store.listTaskComments(shallow.tasks[0]!.id)).toEqual([]);
+
+    const deep = await store.copyEvent(source.id, { title: '深副本', mode: 'deep' });
+    const copiedFirst = deep.tasks.find((task) => task.title === '第一步')!;
+    expect(copiedFirst.status).toBe('in_progress');
+    expect(copiedFirst.statusChangedAt).toBe((await store.getEvent(source.id)).tasks.find((task) => task.id === first.id)!.statusChangedAt);
+    expect(await store.getTaskHistory(copiedFirst.id)).toEqual([
+      expect.objectContaining({ fromStatus: 'not_started', toStatus: 'in_progress', comment: '开始执行' })
+    ]);
+    expect(await store.listTaskComments(copiedFirst.id)).toEqual([
+      expect.objectContaining({ content: '保留评论' })
+    ]);
+  });
+
   it('only treats events with running or paused tasks as active', async () => {
     const creating = await store.createEvent({ title: '待规划', description: '', labelIds: [] });
     await store.createTask(creating.id, { title: '未开始', description: '', positionX: 0, positionY: 0 });
@@ -63,7 +95,7 @@ describe('SagnexStore', () => {
 
     const focused = (await store.listEvents()).find((item) => item.id === event.id)!;
     const full = (await store.listEvents({ preview: 'full' })).find((item) => item.id === event.id)!;
-    expect(focused.previewTasks).toHaveLength(8);
+    expect(focused.previewTasks).toHaveLength(3);
     expect(full.previewTasks).toHaveLength(10);
   });
 

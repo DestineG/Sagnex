@@ -1,10 +1,11 @@
 import type { EventStatus } from '@sagnex/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Archive, ArchiveRestore, MoreHorizontal, Plus, Search, Trash2 } from 'lucide-react';
+import { Archive, ArchiveRestore, Copy, MoreHorizontal, Plus, Search, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, eventStatusText, formatDate } from '../api';
 import { Dialog } from '../components/Dialog';
+import { CopyEventDialog } from '../components/CopyEventDialog';
 import { EventFormDialog } from '../components/EventFormDialog';
 import { EventTagSummary } from '../components/EventTagSummary';
 import { LabelPicker } from '../components/LabelPicker';
@@ -19,6 +20,7 @@ export function EventsPage() {
   const [status, setStatus] = useState<StatusFilter>('all');
   const [labelId, setLabelId] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
+  const [copyTarget, setCopyTarget] = useState<{ id: string; title: string } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
   const { data: allEvents = [], isLoading } = useQuery({ queryKey: ['events', 'all'], queryFn: () => api.listEvents('?preview=full') });
   const { data: labels = [] } = useQuery({ queryKey: ['labels'], queryFn: api.listLabels });
@@ -31,6 +33,7 @@ export function EventsPage() {
   }), [allEvents, labelId, search, status]);
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['events'] });
   const createEvent = useMutation({ mutationFn: api.createEvent, onSuccess: async (event) => { await refresh(); setCreateOpen(false); navigate(`/events/${event.id}`, { state: { returnTo: '/events' } }); } });
+  const copyEvent = useMutation({ mutationFn: ({ id, input }: { id: string; input: Parameters<typeof api.copyEvent>[1] }) => api.copyEvent(id, input), onSuccess: async (event) => { await refresh(); setCopyTarget(null); navigate(`/events/${event.id}`, { state: { returnTo: '/events' } }); } });
   const archiveEvent = useMutation({ mutationFn: api.archiveEvent, onSuccess: refresh });
   const restoreEvent = useMutation({ mutationFn: api.restoreEvent, onSuccess: refresh });
   const deleteEvent = useMutation({ mutationFn: api.deleteEvent, onSuccess: async () => { setDeleteTarget(null); await refresh(); } });
@@ -59,17 +62,20 @@ export function EventsPage() {
           <span>{event.completedTasks} / {event.totalTasks}</span>
           <span className="progress"><i style={{ width: `${event.totalTasks ? (event.completedTasks / event.totalTasks) * 100 : 0}%` }} /></span>
           <time>{formatDate(event.updatedAt)}</time>
-          {event.archivedAt ? <details className="event-actions-menu" onClick={(click) => click.stopPropagation()}>
+          <details className="event-actions-menu" onClick={(click) => click.stopPropagation()}>
             <summary role="button" aria-label="事件操作" title="事件操作"><MoreHorizontal /></summary>
             <div className="event-actions-popover">
-              <button type="button" onClick={() => restoreEvent.mutate(event.id)}><ArchiveRestore />恢复事件</button>
-              <button className="danger" type="button" onClick={() => setDeleteTarget({ id: event.id, title: event.title })}><Trash2 />永久删除</button>
+              <button type="button" onClick={() => setCopyTarget({ id: event.id, title: event.title })}><Copy />复制事件</button>
+              {event.archivedAt
+                ? <><button type="button" onClick={() => restoreEvent.mutate(event.id)}><ArchiveRestore />恢复事件</button><button className="danger" type="button" onClick={() => setDeleteTarget({ id: event.id, title: event.title })}><Trash2 />永久删除</button></>
+                : <button type="button" onClick={() => archiveEvent.mutate(event.id)}><Archive />归档事件</button>}
             </div>
-          </details> : <button className="icon-button event-archive-button" type="button" aria-label={`归档${event.title}`} data-tooltip="归档事件" onClick={(click) => { click.stopPropagation(); archiveEvent.mutate(event.id); }}><Archive /></button>}
+          </details>
         </footer>
       </article>)}
     </div>}
     {createOpen && <EventFormDialog labels={labels} onClose={() => setCreateOpen(false)} onCreate={(input) => createEvent.mutateAsync(input).then(() => undefined)} onCreateLabel={createLabel} />}
+    {copyTarget && <CopyEventDialog sourceTitle={copyTarget.title} onClose={() => setCopyTarget(null)} onCopy={(input) => copyEvent.mutateAsync({ id: copyTarget.id, input }).then(() => undefined)} />}
     {deleteTarget && <Dialog title="永久删除事件" onClose={() => setDeleteTarget(null)} onSubmit={(event) => { event.preventDefault(); deleteEvent.mutate(deleteTarget.id); }} submitLabel="永久删除" destructive busy={deleteEvent.isPending}><p>“{deleteTarget.title}”及其任务和历史记录将永久删除，无法恢复。</p></Dialog>}
   </section>;
 }

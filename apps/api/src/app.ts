@@ -1,4 +1,5 @@
 import {
+  copyEventInputSchema,
   createDependencyInputSchema,
   createEventInputSchema,
   createLabelInputSchema,
@@ -79,6 +80,10 @@ export function createApp(context: DatabaseContext, options: { fetcher?: typeof 
     });
   });
   app.post('/api/events', async (request, reply) => reply.status(201).send(await store.createEvent(createEventInputSchema.parse(request.body))));
+  app.post('/api/events/:eventId/copy', async (request, reply) => {
+    const { eventId } = eventIdParamsSchema.parse(request.params);
+    return reply.status(201).send(await store.copyEvent(eventId, copyEventInputSchema.parse(request.body)));
+  });
   app.get('/api/events/:id', async (request) => store.getEvent(idParamsSchema.parse(request.params).id));
   app.patch('/api/events/:id', async (request) => store.updateEvent(idParamsSchema.parse(request.params).id, updateEventInputSchema.parse(request.body)));
   app.post('/api/events/:id/archive', async (request) => store.setArchived(idParamsSchema.parse(request.params).id, true));

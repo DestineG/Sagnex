@@ -1,5 +1,6 @@
 import type {
   BackupEnvelope,
+  CopyEventInput,
   CreateDependencyInput,
   CreateEventInput,
   CreateLabelInput,
@@ -59,6 +60,7 @@ export const api = {
   listEvents: (query = '') => request<EventSummary[]>(`/api/events${query}`),
   getEvent: (id: string) => request<EventGraph>(`/api/events/${id}`),
   createEvent: (input: CreateEventInput) => request<EventGraph>('/api/events', { method: 'POST', ...json(input) }),
+  copyEvent: (eventId: string, input: CopyEventInput) => request<EventGraph>(`/api/events/${eventId}/copy`, { method: 'POST', ...json(input) }),
   updateEvent: (id: string, input: UpdateEventInput) => request<EventGraph>(`/api/events/${id}`, { method: 'PATCH', ...json(input) }),
   archiveEvent: (id: string) => request<EventGraph>(`/api/events/${id}/archive`, { method: 'POST' }),
   restoreEvent: (id: string) => request<EventGraph>(`/api/events/${id}/restore`, { method: 'POST' }),

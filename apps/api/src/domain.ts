@@ -51,10 +51,12 @@ export function wouldCreateCycle(
   return false;
 }
 
-export function selectPreviewTaskIds(tasks: Task[], dependencies: Dependency[], limit = 8): Set<string> {
+export function selectPreviewTaskIds(tasks: Task[], dependencies: Dependency[], limit = 3): Set<string> {
   if (tasks.length === 0) return new Set();
   const visibleIds = new Set(tasks.map((task) => task.id));
-  const active = tasks.filter((task) => task.status === 'in_progress' || task.status === 'paused');
+  const active = tasks
+    .filter((task) => task.status === 'in_progress' || task.status === 'paused')
+    .sort((a, b) => b.statusChangedAt.localeCompare(a.statusChangedAt) || b.updatedAt.localeCompare(a.updatedAt));
   const targets = new Set(dependencies.filter((edge) => visibleIds.has(edge.sourceTaskId) && visibleIds.has(edge.targetTaskId)).map((edge) => edge.sourceTaskId));
   const focus = active.length > 0 ? active : tasks.filter((task) => !targets.has(task.id));
   const focusIds = new Set(focus.map((task) => task.id));
@@ -67,6 +69,7 @@ export function selectPreviewTaskIds(tasks: Task[], dependencies: Dependency[], 
     const aRank = focusIds.has(a.id) ? 0 : neighbors.has(a.id) ? 1 : 2;
     const bRank = focusIds.has(b.id) ? 0 : neighbors.has(b.id) ? 1 : 2;
     if (aRank !== bRank) return aRank - bRank;
+    if (aRank === 0 && active.length > 0) return b.statusChangedAt.localeCompare(a.statusChangedAt) || b.updatedAt.localeCompare(a.updatedAt);
     return b.updatedAt.localeCompare(a.updatedAt);
   });
   return new Set(ordered.slice(0, limit).map((task) => task.id));

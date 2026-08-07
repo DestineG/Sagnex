@@ -231,7 +231,6 @@ svg { width: 17px; height: 17px; flex: 0 0 auto; }
 .event-tile-foot { display: flex; align-items: center; gap: 9px; min-width: 0; padding-top: 10px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
 .event-tile-foot time { margin-left: auto; white-space: nowrap; }
 .event-actions-menu { margin-left: 1px; }
-.event-archive-button { width: 30px; min-height: 30px; height: 30px; margin-left: 1px; border-color: transparent; color: var(--muted-strong); }
 .event-actions-menu summary { width: 30px; height: 30px; border-radius: 5px; color: var(--muted-strong); }
 .event-actions-menu summary:hover { background: var(--subtle); }
 .event-actions-popover { display: grid; width: 166px; padding: 5px; }
@@ -321,6 +320,26 @@ svg { width: 17px; height: 17px; flex: 0 0 auto; }
 .field textarea { resize: vertical; }
 .field.compact { margin-top: 12px; }
 fieldset.field { padding: 0; border: 0; }
+.copy-mode-field { gap: 9px; }
+.copy-mode-field legend { margin-bottom: 1px; }
+.copy-mode {
+  display: grid;
+  grid-template-columns: 18px 22px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  min-height: 70px;
+  padding: 12px 13px;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  background: var(--surface);
+  cursor: pointer;
+}
+.copy-mode:hover { border-color: #9abdab; background: #fbfdfc; }
+.copy-mode.selected { border-color: #72aa90; background: var(--green-soft); box-shadow: 0 0 0 2px rgb(19 122 85 / 8%); }
+.copy-mode > input { width: 16px; height: 16px; min-height: 0; margin: 2px 0 0; padding: 0; accent-color: var(--green); box-shadow: none; }
+.copy-mode > svg { width: 19px; height: 19px; margin-top: 1px; color: var(--muted-strong); }
+.copy-mode > span { display: grid; gap: 3px; min-width: 0; }
+.copy-mode small { color: var(--muted); font-size: 12px; line-height: 1.45; }
 .color-grid { display: flex; gap: 10px; flex-wrap: wrap; }
 .color-swatch { width: 32px; height: 32px; border: 3px solid var(--surface); border-radius: 6px; box-shadow: 0 0 0 1px var(--line-strong); cursor: pointer; }
 .color-swatch.selected { box-shadow: 0 0 0 2px var(--text); }

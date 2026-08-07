@@ -124,6 +124,11 @@ export const updateEventInputSchema = z.object({
   labelIds: z.array(z.string().uuid()).optional()
 });
 
+export const copyEventInputSchema = z.object({
+  title: z.string().trim().min(1).max(160),
+  mode: z.enum(['shallow', 'deep'])
+});
+
 export const createTaskInputSchema = z.object({
   title: z.string().trim().min(1).max(160),
   description: z.string().trim().max(2000).default(''),
@@ -203,6 +208,7 @@ export type EventGraph = z.infer<typeof eventGraphSchema>;
 export type BackupEnvelope = z.infer<typeof backupEnvelopeSchema>;
 export type CreateEventInput = z.infer<typeof createEventInputSchema>;
 export type UpdateEventInput = z.infer<typeof updateEventInputSchema>;
+export type CopyEventInput = z.infer<typeof copyEventInputSchema>;
 export type CreateTaskInput = z.infer<typeof createTaskInputSchema>;
 export type UpdateTaskInput = z.infer<typeof updateTaskInputSchema>;
 export type UpdateLayoutInput = z.infer<typeof updateLayoutInputSchema>;

@@ -69,6 +69,32 @@ function StatusGlyph({ status, x, y }: { status: TaskStatus; x: number; y: numbe
   return <circle cx={x + 5} cy={y} r="5" fill="none" stroke={color} strokeWidth="1.8" />;
 }
 
+function estimatedGlyphWidth(character: string, fontSize: number): number {
+  if (/\s/.test(character)) return fontSize * 0.32;
+  if ((character.codePointAt(0) ?? 0) <= 0x7f) {
+    if (/[A-Z0-9]/.test(character)) return fontSize * 0.62;
+    if (/[a-z]/.test(character)) return fontSize * 0.54;
+    return fontSize * 0.42;
+  }
+  return fontSize;
+}
+
+export function truncateSvgText(value: string, maxWidth: number, fontSize: number): string {
+  const characters = Array.from(value);
+  const totalWidth = characters.reduce((width, character) => width + estimatedGlyphWidth(character, fontSize), 0);
+  if (totalWidth <= maxWidth) return value;
+  const ellipsisWidth = estimatedGlyphWidth('…', fontSize);
+  let width = 0;
+  let result = '';
+  for (const character of characters) {
+    const characterWidth = estimatedGlyphWidth(character, fontSize);
+    if (width + characterWidth + ellipsisWidth > maxWidth) break;
+    result += character;
+    width += characterWidth;
+  }
+  return `${result}…`;
+}
+
 export function GraphSvg({ tasks, dependencies, className, width, height, interactive = false, showGrid = true, onTaskClick }: GraphSvgProps) {
   if (tasks.length === 0) return null;
   const bounds = boundsFor(tasks);
@@ -85,6 +111,9 @@ export function GraphSvg({ tasks, dependencies, className, width, height, intera
   >
     <defs>
       <pattern id="sagnex-grid" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="1" fill="#dbe2dd" /></pattern>
+      {tasks.map((task) => <clipPath id={`task-text-${task.id}`} key={task.id}>
+        <rect x={task.positionX + 18} y={task.positionY + 9} width={NODE_WIDTH - 34} height="49" />
+      </clipPath>)}
     </defs>
     <rect x={bounds.minX} y={bounds.minY} width={bounds.width} height={bounds.height} fill="#f6f8f6" />
     {showGrid && <rect x={bounds.minX} y={bounds.minY} width={bounds.width} height={bounds.height} fill="url(#sagnex-grid)" />}
@@ -106,8 +135,8 @@ export function GraphSvg({ tasks, dependencies, className, width, height, intera
         const node = <g>
           <rect x={task.positionX} y={task.positionY} width={NODE_WIDTH} height={NODE_HEIGHT} rx="7" fill={palette.fill} stroke={palette.border} strokeWidth="2" />
           <rect x={task.positionX} y={task.positionY} width="5" height={NODE_HEIGHT} rx="2.5" fill={palette.accent} />
-          <text x={task.positionX + 18} y={task.positionY + 27} fill="#1f2923" fontFamily="Segoe UI, Microsoft YaHei, sans-serif" fontSize="15" fontWeight="600">{task.title.length > 20 ? `${task.title.slice(0, 19)}…` : task.title}</text>
-          {task.description && <text x={task.positionX + 18} y={task.positionY + 51} fill="#69756e" fontFamily="Segoe UI, Microsoft YaHei, sans-serif" fontSize="11">{task.description.length > 25 ? `${task.description.slice(0, 24)}…` : task.description}</text>}
+          <text clipPath={`url(#task-text-${task.id})`} x={task.positionX + 18} y={task.positionY + 27} fill="#1f2923" fontFamily="Segoe UI, Microsoft YaHei, sans-serif" fontSize="15" fontWeight="600">{truncateSvgText(task.title, NODE_WIDTH - 36, 15)}</text>
+          {task.description && <text clipPath={`url(#task-text-${task.id})`} x={task.positionX + 18} y={task.positionY + 51} fill="#69756e" fontFamily="Segoe UI, Microsoft YaHei, sans-serif" fontSize="11">{truncateSvgText(task.description, NODE_WIDTH - 36, 11)}</text>}
           <StatusGlyph status={task.status} x={task.positionX + 19} y={task.positionY + 82} />
           <text x={task.positionX + 37} y={task.positionY + 87} fill={palette.text} fontFamily="Segoe UI, Microsoft YaHei, sans-serif" fontSize="12">{taskStatusText[task.status]}</text>
           <text x={task.positionX + NODE_WIDTH - 16} y={task.positionY + 87} textAnchor="end" fill="#69756e" fontFamily="Segoe UI, Microsoft YaHei, sans-serif" fontSize="10">{formatStatusDate(task.statusChangedAt)}</text>

@@ -1,6 +1,7 @@
 import {
   backupEnvelopeSchema,
   type BackupEnvelope,
+  type CopyEventInput,
   type CreateDependencyInput,
   type CreateEventInput,
   type CreateLabelInput,
@@ -186,6 +187,72 @@ export class SagnexStore {
       if (input.labelIds.length > 0) tx.insert(eventLabels).values(input.labelIds.map((labelId) => ({ eventId: id, labelId }))).run();
     });
     return this.getEvent(id);
+  }
+
+  async copyEvent(sourceEventId: string, input: CopyEventInput): Promise<EventGraph> {
+    const sourceEvent = await this.requireEvent(sourceEventId);
+    const [sourceTasks, sourceDependencies, sourceLabels] = await Promise.all([
+      this.context.db.select().from(tasks).where(eq(tasks.eventId, sourceEventId)).orderBy(asc(tasks.createdAt)),
+      this.context.db.select().from(dependencies).where(eq(dependencies.eventId, sourceEventId)).orderBy(asc(dependencies.createdAt)),
+      this.context.db.select().from(eventLabels).where(eq(eventLabels.eventId, sourceEventId))
+    ]);
+    const sourceTaskIds = sourceTasks.map((task) => task.id);
+    const [sourceChanges, sourceComments] = input.mode === 'deep' && sourceTaskIds.length > 0
+      ? await Promise.all([
+          this.context.db.select().from(stateChanges).where(inArray(stateChanges.taskId, sourceTaskIds)),
+          this.context.db.select().from(taskComments).where(inArray(taskComments.taskId, sourceTaskIds))
+        ])
+      : [[], []];
+
+    const timestamp = now();
+    const eventId = crypto.randomUUID();
+    const taskIds = new Map(sourceTasks.map((task) => [task.id, crypto.randomUUID()]));
+    const copiedTasks = sourceTasks.map((task) => ({
+      ...task,
+      id: taskIds.get(task.id)!,
+      eventId,
+      status: input.mode === 'deep' ? task.status : 'not_started' as const,
+      createdAt: input.mode === 'deep' ? task.createdAt : timestamp,
+      updatedAt: input.mode === 'deep' ? task.updatedAt : timestamp,
+      statusChangedAt: input.mode === 'deep' ? task.statusChangedAt : timestamp
+    }));
+    const copiedDependencies = sourceDependencies.map((dependency) => ({
+      ...dependency,
+      id: crypto.randomUUID(),
+      eventId,
+      sourceTaskId: taskIds.get(dependency.sourceTaskId)!,
+      targetTaskId: taskIds.get(dependency.targetTaskId)!,
+      createdAt: input.mode === 'deep' ? dependency.createdAt : timestamp
+    }));
+    const copiedChanges = sourceChanges.map((change) => ({
+      ...change,
+      id: crypto.randomUUID(),
+      taskId: taskIds.get(change.taskId)!
+    }));
+    const copiedComments = sourceComments.map((comment) => ({
+      ...comment,
+      id: crypto.randomUUID(),
+      taskId: taskIds.get(comment.taskId)!
+    }));
+
+    this.context.db.transaction((tx) => {
+      tx.insert(events).values({
+        id: eventId,
+        title: input.title,
+        description: sourceEvent.description,
+        archivedAt: null,
+        createdAt: timestamp,
+        updatedAt: timestamp
+      }).run();
+      if (sourceLabels.length > 0) {
+        tx.insert(eventLabels).values(sourceLabels.map((row) => ({ eventId, labelId: row.labelId }))).run();
+      }
+      if (copiedTasks.length > 0) tx.insert(tasks).values(copiedTasks).run();
+      if (copiedDependencies.length > 0) tx.insert(dependencies).values(copiedDependencies).run();
+      if (copiedChanges.length > 0) tx.insert(stateChanges).values(copiedChanges).run();
+      if (copiedComments.length > 0) tx.insert(taskComments).values(copiedComments).run();
+    });
+    return this.getEvent(eventId);
   }
 
   async updateEvent(id: string, input: UpdateEventInput): Promise<EventGraph> {

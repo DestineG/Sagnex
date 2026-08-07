@@ -17,6 +17,16 @@ describe('API', () => {
     expect(archived.json().archivedAt).toBeTruthy();
   });
 
+  it('copies an event with a validated copy mode', async () => {
+    const created = await app.inject({ method: 'POST', url: '/api/events', payload: { title: '事件', description: '', labelIds: [] } });
+    const event = created.json();
+    const copied = await app.inject({ method: 'POST', url: `/api/events/${event.id}/copy`, payload: { title: '事件副本', mode: 'shallow' } });
+    expect(copied.statusCode, copied.body).toBe(201);
+    expect(copied.json()).toMatchObject({ title: '事件副本', archivedAt: null });
+    const invalid = await app.inject({ method: 'POST', url: `/api/events/${event.id}/copy`, payload: { title: '无效副本', mode: 'unknown' } });
+    expect(invalid.statusCode).toBe(400);
+  });
+
   it('filters by the expanded event statuses', async () => {
     const created = await app.inject({ method: 'POST', url: '/api/events', payload: { title: '待开始事件', description: '', labelIds: [] } });
     const event = created.json();

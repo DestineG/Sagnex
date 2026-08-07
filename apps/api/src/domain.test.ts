@@ -46,4 +46,14 @@ describe('domain rules', () => {
     const dependencies = [dependency('a', 'b'), dependency('b', 'c')];
     expect(selectPreviewTaskIds(tasks, dependencies, 3)).toEqual(new Set(['a', 'b', 'c']));
   });
+
+  it('limits focused previews to the three most recently activated tasks', () => {
+    const tasks = [
+      task('a', 'in_progress', '2026-01-01T00:00:00.000Z'),
+      task('b', 'paused', '2026-01-02T00:00:00.000Z'),
+      task('c', 'in_progress', '2026-01-03T00:00:00.000Z'),
+      task('d', 'paused', '2026-01-04T00:00:00.000Z')
+    ];
+    expect(selectPreviewTaskIds(tasks, [])).toEqual(new Set(['d', 'c', 'b']));
+  });
 });

@@ -285,7 +285,7 @@ function EventInspector({ graph, labels, onUpdate }: { graph: EventGraph; labels
   </div>;
 }
 
-function TaskInspector({ graph, task, history, comments, onUpdate, onTransition, onCreateComment, onDeleteComment, onSelectTask, onDelete, transitionPending, commentPending }: {
+function TaskInspector({ graph, task, history, comments, onUpdate, onTransition, onCreateComment, onDeleteComment, onSelectTask, onDelete, transitionPending, commentPending, deletePending }: {
   graph: EventGraph;
   task: Task;
   history: StateChange[];
@@ -298,6 +298,7 @@ function TaskInspector({ graph, task, history, comments, onUpdate, onTransition,
   onDelete: () => void;
   transitionPending: boolean;
   commentPending: boolean;
+  deletePending: boolean;
 }) {
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description);
@@ -321,7 +322,7 @@ function TaskInspector({ graph, task, history, comments, onUpdate, onTransition,
     </section>
     <section><p className="inspector-label">任务评论</p>{!graph.archivedAt && <form className="comment-compose" onSubmit={(event) => { event.preventDefault(); if (comment.trim()) onCreateComment(comment.trim(), () => setComment('')); }}><textarea aria-label="任务评论" rows={2} maxLength={1000} value={comment} onChange={(event) => setComment(event.target.value)} placeholder="记录补充信息" /><button className="icon-button primary-icon" type="submit" disabled={!comment.trim() || commentPending} aria-label="提交评论" data-tooltip="提交评论"><Send /></button></form>}{comments.length ? <div className="comment-list">{comments.map((item) => <article key={item.id}><p>{item.content}</p><footer><time>{formatDate(item.createdAt)}</time>{!graph.archivedAt && <button className="icon-button danger" type="button" aria-label="删除评论" data-tooltip="删除评论" onClick={() => onDeleteComment(item.id)}><Trash2 /></button>}</footer></article>)}</div> : <p className="muted">暂无评论</p>}</section>
     <section><p className="inspector-label">状态历史</p>{history.length ? <div className="history-list">{history.map((change) => <div key={change.id}><i /><span>{taskStatusText[change.fromStatus]} → {taskStatusText[change.toStatus]}{change.comment && <em>{change.comment}</em>}<time>{formatDate(change.changedAt)}</time></span></div>)}</div> : <p className="muted">尚无状态变化</p>}</section>
-    {!graph.archivedAt && <section><button className="button danger-text" onClick={onDelete}><Trash2 />删除任务</button></section>}
+    {!graph.archivedAt && <section><button className="button danger-text" disabled={deletePending} onClick={onDelete}><Trash2 />{deletePending ? '删除中' : '删除任务'}</button></section>}
   </div>;
 }
 
@@ -411,9 +412,66 @@ function Editor({ graph, labels, onExportJson, onArchive, onRestoreEvent, onCopy
   } });
   const createComment = useMutation({ mutationFn: ({ taskId, content }: { taskId: string; content: string; afterSuccess: () => void }) => api.createTaskComment(taskId, content), onSuccess: async (_result, variables) => { variables.afterSuccess(); await queryClient.invalidateQueries({ queryKey: ['task-comments', variables.taskId] }); await refresh(); }, onError: (cause) => setError(cause.message) });
   const removeComment = useMutation({ mutationFn: api.deleteTaskComment, onSuccess: async () => { if (selectedTaskId) await queryClient.invalidateQueries({ queryKey: ['task-comments', selectedTaskId] }); await refresh(); }, onError: (cause) => setError(cause.message) });
-  const removeTask = useMutation({ mutationFn: api.deleteTask, onSuccess: async (_result, taskId) => { await queryClient.invalidateQueries({ queryKey: ['task-history', taskId] }); await queryClient.invalidateQueries({ queryKey: ['task-comments', taskId] }); setSearchParams({}); await refresh(); }, onError: (cause) => setError(cause.message) });
+  const removeTask = useMutation({
+    mutationFn: api.deleteTask,
+    onMutate: async (taskId) => {
+      const queryKey = ['event', graph.id] as const;
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey }),
+        queryClient.cancelQueries({ queryKey: ['task-history', taskId] }),
+        queryClient.cancelQueries({ queryKey: ['task-comments', taskId] })
+      ]);
+      const previousGraph = queryClient.getQueryData<EventGraph>(queryKey) ?? graph;
+      const deletedTask = previousGraph.tasks.find((task) => task.id === taskId);
+      const remainingTasks = previousGraph.tasks.filter((task) => task.id !== taskId);
+      const nearestTask = deletedTask ? [...remainingTasks].sort((a, b) => {
+        const distanceA = (a.positionX - deletedTask.positionX) ** 2 + (a.positionY - deletedTask.positionY) ** 2;
+        const distanceB = (b.positionX - deletedTask.positionX) ** 2 + (b.positionY - deletedTask.positionY) ** 2;
+        return distanceA - distanceB;
+      })[0] : undefined;
+
+      queryClient.setQueryData<EventGraph>(queryKey, (current) => current ? {
+        ...current,
+        tasks: current.tasks.filter((task) => task.id !== taskId),
+        dependencies: current.dependencies.filter((edge) => edge.sourceTaskId !== taskId && edge.targetTaskId !== taskId)
+      } : current);
+      setNodes((current) => current.filter((node) => node.id !== taskId));
+      setEdges((current) => current.filter((edge) => edge.source !== taskId && edge.target !== taskId));
+      setSearchParams({});
+
+      if (nearestTask) {
+        window.requestAnimationFrame(() => {
+          void setCenter(nearestTask.positionX + FLOW_NODE_WIDTH / 2, nearestTask.positionY + FLOW_NODE_HEIGHT / 2, {
+            zoom: Math.min(1.2, Math.max(0.9, viewport.zoom)),
+            duration: 250
+          });
+        });
+      }
+      return { previousGraph, selectedTaskId };
+    },
+    onSuccess: async (_result, taskId) => {
+      queryClient.removeQueries({ queryKey: ['task-history', taskId] });
+      queryClient.removeQueries({ queryKey: ['task-comments', taskId] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['event', graph.id] }),
+        queryClient.invalidateQueries({ queryKey: ['events'] })
+      ]);
+    },
+    onError: async (cause, _taskId, context) => {
+      if (context?.previousGraph) queryClient.setQueryData(['event', graph.id], context.previousGraph);
+      centeredTaskId.current = null;
+      if (context?.selectedTaskId) setSearchParams({ task: context.selectedTaskId });
+      setError(cause.message);
+      await queryClient.invalidateQueries({ queryKey: ['event', graph.id] });
+    }
+  });
   const createDependency = useMutation({ mutationFn: (connection: Connection) => api.createDependency(graph.id, { sourceTaskId: connection.source!, targetTaskId: connection.target! }), onSuccess: refresh, onError: (cause) => setError(cause.message) });
   const deleteDependency = useMutation({ mutationFn: api.deleteDependency, onSuccess: refresh, onError: (cause) => setError(cause.message) });
+
+  function requestTaskDeletion(taskId: string) {
+    if (removeTask.isPending) return;
+    if (window.confirm('永久删除这个任务？任务历史、评论和相关依赖也会一并删除。')) removeTask.mutate(taskId);
+  }
 
   async function saveLayout(nextNodes: TaskFlowNode[]) {
     const queryKey = ['event', graph.id] as const;
@@ -494,6 +552,15 @@ function Editor({ graph, labels, onExportJson, onArchive, onRestoreEvent, onCopy
           onNodeDragStop={(_event, node) => void saveLayout([{ ...node } as TaskFlowNode]).catch((cause: Error) => setError(cause.message))}
           onConnect={(connection) => createDependency.mutate(connection)}
           onEdgesDelete={(removed) => removed.forEach((edge) => deleteDependency.mutate(edge.id))}
+          onBeforeDelete={async ({ nodes: pendingNodes }) => {
+            if (pendingNodes.length === 0) return true;
+            if (pendingNodes.length > 1) {
+              setError('请一次只删除一个任务');
+              return false;
+            }
+            requestTaskDeletion(pendingNodes[0]!.id);
+            return false;
+          }}
           nodesDraggable={!graph.archivedAt} nodesConnectable={!graph.archivedAt}
           edgesFocusable={!graph.archivedAt} deleteKeyCode={graph.archivedAt ? null : ['Backspace', 'Delete']}
           fitView fitViewOptions={{ padding: 0.22, maxZoom: 1.2 }} minZoom={0.25} maxZoom={1.6} proOptions={{ hideAttribution: true }}
@@ -501,7 +568,7 @@ function Editor({ graph, labels, onExportJson, onArchive, onRestoreEvent, onCopy
       </div>
     </div>
     <aside className="inspector">
-      {selectedTask ? <TaskInspector key={selectedTask.id} graph={graph} task={selectedTask} history={history} comments={comments} onUpdate={(value) => updateTask.mutate({ id: selectedTask.id, value })} onTransition={(status, comment, afterSuccess) => transition.mutate({ id: selectedTask.id, status, comment, afterSuccess })} onCreateComment={(content, afterSuccess) => createComment.mutate({ taskId: selectedTask.id, content, afterSuccess })} onDeleteComment={(id) => { if (window.confirm('删除这条任务评论？')) removeComment.mutate(id); }} onSelectTask={(id) => setSearchParams({ task: id })} transitionPending={transition.isPending} commentPending={createComment.isPending} onDelete={() => { if (window.confirm('永久删除这个任务？任务历史、评论和相关依赖也会一并删除。')) removeTask.mutate(selectedTask.id); }} /> : <EventInspector key={graph.id} graph={graph} labels={labels} onUpdate={(value) => updateEvent.mutate(value)} />}
+      {selectedTask ? <TaskInspector key={selectedTask.id} graph={graph} task={selectedTask} history={history} comments={comments} onUpdate={(value) => updateTask.mutate({ id: selectedTask.id, value })} onTransition={(status, comment, afterSuccess) => transition.mutate({ id: selectedTask.id, status, comment, afterSuccess })} onCreateComment={(content, afterSuccess) => createComment.mutate({ taskId: selectedTask.id, content, afterSuccess })} onDeleteComment={(id) => { if (window.confirm('删除这条任务评论？')) removeComment.mutate(id); }} onSelectTask={(id) => setSearchParams({ task: id })} transitionPending={transition.isPending} commentPending={createComment.isPending} deletePending={removeTask.isPending} onDelete={() => requestTaskDeletion(selectedTask.id)} /> : <EventInspector key={graph.id} graph={graph} labels={labels} onUpdate={(value) => updateEvent.mutate(value)} />}
     </aside>
     {taskDialog && <TaskDialog onClose={() => setTaskDialog(false)} onCreate={(value) => createTask.mutateAsync(value).then(() => undefined)} />}
     {copyOpen && <CopyEventDialog sourceTitle={graph.title} onClose={() => setCopyOpen(false)} onCopy={onCopy} />}

@@ -35,6 +35,65 @@ test('creates a deep event copy from the event actions menu', async ({ page, req
   ]);
 });
 
+test('uses one confirmed and recoverable task deletion flow', async ({ page, request }) => {
+  const suffix = Date.now().toString().slice(-6);
+  const created = await request.post('/api/events', { data: { title: `删除流程-${suffix}`, description: '', labelIds: [] } });
+  const event = await created.json();
+  const first = await (await request.post(`/api/events/${event.id}/tasks`, { data: { title: '键盘删除任务', description: '', positionX: 40, positionY: 80 } })).json();
+  const remaining = await (await request.post(`/api/events/${event.id}/tasks`, { data: { title: '保留任务', description: '', positionX: 1800, positionY: 900 } })).json();
+  await request.post(`/api/events/${event.id}/dependencies`, { data: { sourceTaskId: first.id, targetTaskId: remaining.id } });
+
+  await page.goto(`/events/${event.id}?task=${first.id}`);
+  await expect(page.locator('.inspector input').first()).toHaveValue('键盘删除任务');
+  let cancelledDialogMessage = '';
+  page.once('dialog', async (dialog) => {
+    cancelledDialogMessage = dialog.message();
+    await dialog.dismiss();
+  });
+  await page.keyboard.press('Delete');
+  expect(cancelledDialogMessage).toContain('永久删除这个任务');
+  await expect(page.locator('.task-node').filter({ hasText: '键盘删除任务' })).toHaveCount(1);
+  const graphAfterCancel = await (await request.get(`/api/events/${event.id}`)).json();
+  expect(graphAfterCancel.tasks).toHaveLength(2);
+  expect(graphAfterCancel.dependencies).toHaveLength(1);
+
+  let releaseKeyboardDelete!: () => void;
+  const keyboardDeleteGate = new Promise<void>((resolve) => { releaseKeyboardDelete = resolve; });
+  await page.route(`**/api/tasks/${first.id}`, async (route) => {
+    if (route.request().method() === 'DELETE') await keyboardDeleteGate;
+    await route.continue();
+  });
+  const keyboardDeleteResponse = page.waitForResponse((response) => response.url().endsWith(`/api/tasks/${first.id}`) && response.request().method() === 'DELETE');
+  page.once('dialog', (confirmation) => confirmation.accept());
+  await page.keyboard.press('Delete');
+  await expect(page.locator('.task-node').filter({ hasText: '键盘删除任务' })).toHaveCount(0);
+  await expect.poll(async () => {
+    const node = await page.locator('.task-node').filter({ hasText: '保留任务' }).boundingBox();
+    const canvas = await page.locator('.flow-canvas').boundingBox();
+    return Boolean(node && canvas && node.x >= canvas.x && node.y >= canvas.y && node.x + node.width <= canvas.x + canvas.width && node.y + node.height <= canvas.y + canvas.height);
+  }).toBe(true);
+  releaseKeyboardDelete();
+  expect((await keyboardDeleteResponse).status()).toBe(204);
+  await page.unroute(`**/api/tasks/${first.id}`);
+
+  const failing = await (await request.post(`/api/events/${event.id}/tasks`, { data: { title: '失败回滚任务', description: '', positionX: 2600, positionY: 1400 } })).json();
+  await page.goto(`/events/${event.id}?task=${failing.id}`);
+  await expect(page.locator('.inspector input').first()).toHaveValue('失败回滚任务');
+  let releaseFailedDelete!: () => void;
+  const failedDeleteGate = new Promise<void>((resolve) => { releaseFailedDelete = resolve; });
+  await page.route(`**/api/tasks/${failing.id}`, async (route) => {
+    await failedDeleteGate;
+    await route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ message: '模拟删除失败' }) });
+  });
+  page.once('dialog', (confirmation) => confirmation.accept());
+  await page.getByRole('button', { name: '删除任务' }).click();
+  await expect(page.locator('.task-node').filter({ hasText: '失败回滚任务' })).toHaveCount(0);
+  releaseFailedDelete();
+  await expect(page.getByText('模拟删除失败')).toBeVisible();
+  await expect(page.locator('.task-node').filter({ hasText: '失败回滚任务' })).toHaveCount(1);
+  await expect(page.locator('.inspector input').first()).toHaveValue('失败回滚任务');
+});
+
 test('completes the local event workflow', async ({ page, request }) => {
   const suffix = Date.now().toString().slice(-6);
   const labelName = `测试-${suffix}`;

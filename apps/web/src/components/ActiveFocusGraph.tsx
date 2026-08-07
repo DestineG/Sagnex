@@ -1,5 +1,6 @@
 import type { Dependency, Task, TaskStatus } from '@sagnex/contracts';
-import { useId, type KeyboardEvent } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useId, useMemo, useState, type KeyboardEvent, type MouseEvent } from 'react';
 import { formatStatusDate, taskStatusText } from '../api';
 import { truncateSvgText } from './GraphSvg';
 import { getEditorEdgePath, GRAPH_EDGE_COLOR, GRAPH_EDGE_WIDTH } from './taskNodeGeometry';
@@ -10,7 +11,9 @@ const FOCUS_WIDTH = 156;
 const FOCUS_HEIGHT = 78;
 const FOCUS_X = (VIEW_WIDTH - FOCUS_WIDTH) / 2;
 const FOCUS_Y = (VIEW_HEIGHT - FOCUS_HEIGHT) / 2;
-const SIDE_MARGIN = 18;
+const SIDE_MARGIN = 44;
+const SIDE_TOP = 18;
+const SIDE_BOTTOM = 38;
 const SIDE_GAP = 20;
 const MAX_SIDE_ROWS = 7;
 
@@ -42,7 +45,7 @@ function layoutSide(tasks: Task[], minX: number, maxX: number, nearestFirst: boo
   const columns = Math.ceil(ordered.length / MAX_SIDE_ROWS);
   const rows = Math.min(MAX_SIDE_ROWS, ordered.length);
   const availableWidth = maxX - minX;
-  const availableHeight = VIEW_HEIGHT - SIDE_MARGIN * 2;
+  const availableHeight = VIEW_HEIGHT - SIDE_TOP - SIDE_BOTTOM;
   const cellWidth = availableWidth / columns;
   const cellHeight = availableHeight / rows;
   const width = Math.max(6, Math.min(36, cellWidth - 6));
@@ -54,7 +57,7 @@ function layoutSide(tasks: Task[], minX: number, maxX: number, nearestFirst: boo
     return {
       task,
       x: minX + visualColumn * cellWidth + (cellWidth - width) / 2,
-      y: SIDE_MARGIN + row * cellHeight + (cellHeight - height) / 2,
+      y: SIDE_TOP + row * cellHeight + (cellHeight - height) / 2,
       width,
       height
     };
@@ -73,8 +76,20 @@ export function ActiveFocusGraph({ tasks, dependencies, focusTaskId, onTaskClick
   const instanceId = useId().replaceAll(':', '');
   const markerId = `${instanceId}-active-arrow`;
   const gridId = `${instanceId}-active-grid`;
-  const focus = tasks.find((task) => task.id === focusTaskId);
+  const activeTasks = useMemo(() => tasks
+    .filter((task) => task.status === 'in_progress' || task.status === 'paused')
+    .sort((a, b) => {
+      if (a.status !== b.status) return a.status === 'in_progress' ? -1 : 1;
+      return b.statusChangedAt.localeCompare(a.statusChangedAt) || b.updatedAt.localeCompare(a.updatedAt);
+    }), [tasks]);
+  const [currentFocusId, setCurrentFocusId] = useState(focusTaskId);
+  const selectedFocusId = activeTasks.some((task) => task.id === currentFocusId)
+    ? currentFocusId
+    : activeTasks.some((task) => task.id === focusTaskId) ? focusTaskId : activeTasks[0]?.id ?? focusTaskId;
+  const focus = tasks.find((task) => task.id === selectedFocusId);
   if (!focus) return <div className="mini-graph empty-mini">尚未添加任务</div>;
+  const currentIndex = Math.max(0, activeTasks.findIndex((task) => task.id === focus.id));
+  const showCarousel = activeTasks.length > 1;
   const taskMap = new Map(tasks.map((task) => [task.id, task]));
   const incomingDependencies = dependencies.filter((edge) => edge.targetTaskId === focus.id && taskMap.has(edge.sourceTaskId));
   const outgoingDependencies = dependencies.filter((edge) => edge.sourceTaskId === focus.id && taskMap.has(edge.targetTaskId));
@@ -91,6 +106,23 @@ export function ActiveFocusGraph({ tasks, dependencies, focusTaskId, onTaskClick
     event.stopPropagation();
     activate(taskId);
   };
+  const changeFocus = (event: MouseEvent<HTMLButtonElement>, offset: number) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const nextIndex = (currentIndex + offset + activeTasks.length) % activeTasks.length;
+    const nextTask = activeTasks[nextIndex];
+    if (nextTask) setCurrentFocusId(nextTask.id);
+  };
+  const selectFocus = (event: MouseEvent<HTMLButtonElement>, index: number) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const selectedTask = activeTasks[index];
+    if (selectedTask) setCurrentFocusId(selectedTask.id);
+  };
+  const markerStart = activeTasks.length <= 7 ? 0 : Math.min(Math.max(currentIndex - 2, 0), activeTasks.length - 5);
+  const markerIndices = activeTasks.length <= 7
+    ? activeTasks.map((_, index) => index)
+    : Array.from({ length: 5 }, (_, index) => markerStart + index);
 
   return <div className="mini-graph active-focus-graph">
     <svg className="active-focus-graph-svg" viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`} preserveAspectRatio="xMidYMid meet" role="img" aria-label="当前任务及直接依赖">
@@ -154,5 +186,24 @@ export function ActiveFocusGraph({ tasks, dependencies, focusTaskId, onTaskClick
         <text x={FOCUS_X + FOCUS_WIDTH - 12} y={FOCUS_Y + FOCUS_HEIGHT - 11} textAnchor="end" fill="#69756e" fontFamily="Segoe UI, Microsoft YaHei, sans-serif" fontSize="9.5">{formatStatusDate(focus.statusChangedAt)}</text>
       </g>
     </svg>
+    {showCarousel && <div className="active-focus-carousel" aria-label={`活跃任务 ${currentIndex + 1} / ${activeTasks.length}`}>
+      <button className="active-carousel-arrow previous" type="button" aria-label="上一个活跃任务" title="上一个活跃任务" onClick={(event) => changeFocus(event, -1)}><ChevronLeft /></button>
+      <button className="active-carousel-arrow next" type="button" aria-label="下一个活跃任务" title="下一个活跃任务" onClick={(event) => changeFocus(event, 1)}><ChevronRight /></button>
+      <div className="active-carousel-dots">
+        {markerStart > 0 && <span className="active-carousel-more" aria-hidden="true" />}
+        {markerIndices.map((index) => {
+          const task = activeTasks[index];
+          return task ? <button
+            className={index === currentIndex ? 'active-carousel-dot selected' : 'active-carousel-dot'}
+            type="button"
+            key={task.id}
+            aria-label={`查看活跃任务 ${index + 1}：${task.title}`}
+            aria-current={index === currentIndex ? 'true' : undefined}
+            onClick={(event) => selectFocus(event, index)}
+          /> : null;
+        })}
+        {markerStart + markerIndices.length < activeTasks.length && <span className="active-carousel-more" aria-hidden="true" />}
+      </div>
+    </div>}
   </div>;
 }

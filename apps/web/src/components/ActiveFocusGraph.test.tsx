@@ -33,4 +33,43 @@ describe('ActiveFocusGraph', () => {
     expect(onTaskClick).toHaveBeenNthCalledWith(1, predecessor.id);
     expect(onTaskClick).toHaveBeenNthCalledWith(2, focus.id);
   });
+
+  it('cycles through running and paused tasks without opening the event', async () => {
+    const onTaskClick = vi.fn();
+    const cardClick = vi.fn();
+    const { container } = render(<div onClick={cardClick}><ActiveFocusGraph tasks={[focus, predecessor, successor]} dependencies={dependencies} focusTaskId={focus.id} onTaskClick={onTaskClick} /></div>);
+
+    await userEvent.click(within(container).getByRole('button', { name: '下一个活跃任务' }));
+    expect(within(container).getByText('后续任务')).toBeInTheDocument();
+    expect(container.querySelector('.active-focus-node')).toHaveAttribute('aria-label', '后续任务，已暂停');
+    expect(onTaskClick).not.toHaveBeenCalled();
+    expect(cardClick).not.toHaveBeenCalled();
+
+    await userEvent.click(within(container).getByRole('button', { name: '下一个活跃任务' }));
+    expect(container.querySelector('.active-focus-node')).toHaveAttribute('aria-label', '当前任务，进行中');
+    await userEvent.click(within(container).getByRole('button', { name: '上一个活跃任务' }));
+    expect(container.querySelector('.active-focus-node')).toHaveAttribute('aria-label', '后续任务，已暂停');
+  });
+
+  it('selects a task from the position dots and hides controls for a single active task', async () => {
+    const { container, rerender } = render(<ActiveFocusGraph tasks={[focus, predecessor, successor]} dependencies={dependencies} focusTaskId={focus.id} />);
+    await userEvent.click(within(container).getByRole('button', { name: '查看活跃任务 2：后续任务' }));
+    expect(container.querySelector('.active-focus-node')).toHaveAttribute('aria-label', '后续任务，已暂停');
+
+    rerender(<ActiveFocusGraph tasks={[focus, predecessor]} dependencies={dependencies.slice(0, 1)} focusTaskId={focus.id} />);
+    expect(within(container).queryByRole('button', { name: '下一个活跃任务' })).not.toBeInTheDocument();
+    expect(container.querySelector('.active-carousel-dots')).not.toBeInTheDocument();
+  });
+
+  it('keeps long carousel indicators compact', () => {
+    const activeTasks = Array.from({ length: 9 }, (_, index): Task => ({
+      ...focus,
+      id: `00000000-0000-4000-8000-${String(index + 10).padStart(12, '0')}`,
+      title: `活跃任务 ${index + 1}`,
+      statusChangedAt: `2026-01-${String(10 - index).padStart(2, '0')}T00:00:00.000Z`
+    }));
+    const { container } = render(<ActiveFocusGraph tasks={activeTasks} dependencies={[]} focusTaskId={activeTasks[0]!.id} />);
+    expect(container.querySelectorAll('.active-carousel-dot')).toHaveLength(5);
+    expect(container.querySelectorAll('.active-carousel-more')).toHaveLength(1);
+  });
 });

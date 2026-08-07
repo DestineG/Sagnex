@@ -56,17 +56,18 @@ describe('domain rules', () => {
     expect(selectPreviewTaskIds(tasks, dependencies)).toEqual(new Set(['a', 'b', 'c']));
   });
 
-  it('prioritizes the newest running task and includes every direct neighbor', () => {
+  it('prioritizes the newest running task and includes every active task with its direct neighbors', () => {
     const tasks = [
       task('a', 'not_started'),
       task('b', 'in_progress', '2026-01-03T00:00:00.000Z'),
       task('c', 'completed'),
       task('d', 'paused', '2026-01-04T00:00:00.000Z'),
       task('e', 'not_started'),
-      task('f', 'not_started')
+      task('f', 'not_started'),
+      task('g', 'not_started')
     ];
-    const dependencies = [dependency('a', 'b'), dependency('c', 'b'), dependency('b', 'e'), dependency('b', 'f')];
+    const dependencies = [dependency('a', 'b'), dependency('c', 'b'), dependency('b', 'e'), dependency('b', 'f'), dependency('e', 'd'), dependency('f', 'g')];
     expect(selectPreviewFocusTask(tasks, dependencies)?.id).toBe('b');
-    expect(selectPreviewTaskIds(tasks, dependencies)).toEqual(new Set(['a', 'b', 'c', 'e', 'f']));
+    expect(selectPreviewTaskIds(tasks, dependencies)).toEqual(new Set(['a', 'b', 'c', 'd', 'e', 'f']));
   });
 });

@@ -22,6 +22,8 @@ test('renders active cards and editor across desktop and mobile', async ({ page,
   await request.post(`/api/tasks/${first.id}/transition`, { data: { toStatus: 'in_progress', confirmSoftDependencies: false } });
   await request.post(`/api/tasks/${first.id}/transition`, { data: { toStatus: 'completed', confirmSoftDependencies: false } });
   await request.post(`/api/tasks/${third.id}/transition`, { data: { toStatus: 'in_progress', confirmSoftDependencies: false } });
+  await request.post(`/api/tasks/${second.id}/transition`, { data: { toStatus: 'in_progress', confirmSoftDependencies: false } });
+  await request.post(`/api/tasks/${second.id}/transition`, { data: { toStatus: 'paused', confirmSoftDependencies: false } });
 
   const createEventWithTask = async (title: string, status: 'not_started' | 'in_progress' | 'paused') => {
     const created = await (await request.post('/api/events', { data: { title, description: '', labelIds: [] } })).json();
@@ -57,7 +59,17 @@ test('renders active cards and editor across desktop and mobile', async ({ page,
   await expect(activeCard.locator('.active-compact-node')).toHaveCount(2);
   await expect(activeCard.locator('.active-focus-edges path')).toHaveCount(2);
   await expect(activeCard.getByLabel('1 个进行中任务')).toBeVisible();
-  await expect(activeCard.getByLabel('0 个暂停任务')).toBeVisible();
+  await expect(activeCard.getByLabel('1 个暂停任务')).toBeVisible();
+  const nextActiveButton = activeCard.getByRole('button', { name: '下一个活跃任务' });
+  expect(Number(await nextActiveButton.evaluate((element) => getComputedStyle(element.parentElement!).opacity))).toBe(0);
+  await activeCard.locator('.active-focus-graph').hover();
+  await expect.poll(async () => Number(await nextActiveButton.evaluate((element) => getComputedStyle(element.parentElement!).opacity))).toBe(1);
+  await nextActiveButton.click();
+  await expect(activeCard.locator('.active-focus-node')).toHaveAttribute('aria-label', '内容校对，已暂停');
+  await expect(activeCard.locator('.active-focus-edges path')).toHaveCount(2);
+  await page.locator('.active-export').evaluate((element) => element.classList.add('exporting'));
+  await expect(activeCard.locator('.active-focus-carousel')).toHaveCSS('display', 'none');
+  await page.locator('.active-export').evaluate((element) => element.classList.remove('exporting'));
   const mainBox = await page.locator('.main-content').boundingBox();
   const actionsBox = await page.locator('.active-page-head .head-actions').boundingBox();
   expect(mainBox).not.toBeNull();
@@ -69,6 +81,7 @@ test('renders active cards and editor across desktop and mobile', async ({ page,
   const activeDownload = await activeDownloadPromise;
   await activeDownload.saveAs('test-results/active-export.png');
   expect((await stat('test-results/active-export.png')).size).toBeGreaterThan(5_000);
+  await expect(activeCard.locator('.active-focus-node')).toHaveAttribute('aria-label', '内容校对，已暂停');
   await page.goto('/events');
   const eventTile = page.locator('.event-tile').filter({ hasText: eventTitle });
   await expect(eventTile.locator('.status-overview-node')).toHaveCount(4);
@@ -131,6 +144,9 @@ test('renders active cards and editor across desktop and mobile', async ({ page,
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
+  const mobileActiveCard = page.locator('.event-card').filter({ hasText: eventTitle });
+  expect(Number(await mobileActiveCard.getByRole('button', { name: '下一个活跃任务' }).evaluate((element) => getComputedStyle(element.parentElement!).opacity))).toBeGreaterThan(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
   await page.screenshot({ path: 'test-results/active-mobile.png', fullPage: true });
   await page.goto('/events');
   await expect(page.locator('.event-tile').filter({ hasText: eventTitle }).locator('.status-overview-node')).toHaveCount(4);

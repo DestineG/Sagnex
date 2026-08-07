@@ -75,10 +75,12 @@ export function selectPreviewFocusTask(tasks: Task[], dependencies: Dependency[]
 export function selectPreviewTaskIds(tasks: Task[], dependencies: Dependency[]): Set<string> {
   const focus = selectPreviewFocusTask(tasks, dependencies);
   if (!focus) return new Set();
-  const selected = new Set([focus.id]);
+  const activeTasks = tasks.filter((task) => task.status === 'in_progress' || task.status === 'paused');
+  const focusIds = new Set(activeTasks.length > 0 ? activeTasks.map((task) => task.id) : [focus.id]);
+  const selected = new Set(focusIds);
   for (const edge of dependencies) {
-    if (edge.targetTaskId === focus.id) selected.add(edge.sourceTaskId);
-    if (edge.sourceTaskId === focus.id) selected.add(edge.targetTaskId);
+    if (focusIds.has(edge.targetTaskId)) selected.add(edge.sourceTaskId);
+    if (focusIds.has(edge.sourceTaskId)) selected.add(edge.targetTaskId);
   }
   return selected;
 }

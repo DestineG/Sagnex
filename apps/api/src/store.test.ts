@@ -102,6 +102,32 @@ describe('SagnexStore', () => {
     expect(full.previewTasks).toHaveLength(10);
   });
 
+  it('returns every active task and one dependency layer for focused previews', async () => {
+    const event = await store.createEvent({ title: '多焦点预览', description: '', labelIds: [] });
+    const leftRunning = await store.createTask(event.id, { title: '进行中前置', description: '', positionX: 0, positionY: 0 });
+    const running = await store.createTask(event.id, { title: '进行中', description: '', positionX: 200, positionY: 0 });
+    const rightRunning = await store.createTask(event.id, { title: '进行中后续', description: '', positionX: 400, positionY: 0 });
+    const secondLayer = await store.createTask(event.id, { title: '第二层', description: '', positionX: 600, positionY: 0 });
+    const leftPaused = await store.createTask(event.id, { title: '暂停前置', description: '', positionX: 0, positionY: 200 });
+    const paused = await store.createTask(event.id, { title: '暂停', description: '', positionX: 200, positionY: 200 });
+    const rightPaused = await store.createTask(event.id, { title: '暂停后续', description: '', positionX: 400, positionY: 200 });
+    await store.transitionTask(running.id, 'in_progress', false);
+    await store.transitionTask(paused.id, 'in_progress', false);
+    await store.transitionTask(paused.id, 'paused', false);
+    await store.createDependency(event.id, { sourceTaskId: leftRunning.id, targetTaskId: running.id });
+    await store.createDependency(event.id, { sourceTaskId: running.id, targetTaskId: rightRunning.id });
+    await store.createDependency(event.id, { sourceTaskId: rightRunning.id, targetTaskId: secondLayer.id });
+    await store.createDependency(event.id, { sourceTaskId: leftPaused.id, targetTaskId: paused.id });
+    await store.createDependency(event.id, { sourceTaskId: paused.id, targetTaskId: rightPaused.id });
+
+    const preview = (await store.listEvents()).find((item) => item.id === event.id)!;
+    expect(preview.previewFocusTaskId).toBe(running.id);
+    expect(new Set(preview.previewTasks.map((task) => task.id))).toEqual(new Set([
+      leftRunning.id, running.id, rightRunning.id, leftPaused.id, paused.id, rightPaused.id
+    ]));
+    expect(preview.previewTasks.some((task) => task.id === secondLayer.id)).toBe(false);
+  });
+
   it('requires confirmation for unmet soft dependencies', async () => {
     const event = await store.createEvent({ title: '发布', description: '', labelIds: [] });
     const first = await store.createTask(event.id, { title: '前置', description: '', positionX: 0, positionY: 0 });

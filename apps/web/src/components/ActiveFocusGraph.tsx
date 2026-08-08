@@ -198,7 +198,7 @@ export function ActiveFocusGraph({ tasks, dependencies, focusTaskId, onTaskClick
     transitionTimer.current = setTimeout(() => {
       transitionTimer.current = null;
       setOutgoingFocusId(null);
-    }, 600);
+    }, 360);
   };
   const changeFocus = (event: MouseEvent<HTMLButtonElement>, offset: number) => {
     event.preventDefault();

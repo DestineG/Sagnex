@@ -163,16 +163,10 @@ svg { width: 17px; height: 17px; flex: 0 0 auto; }
 .active-focus-graph-svg { display: block; width: 100%; height: 100%; }
 .active-focus-layer { transform-box: view-box; transform-origin: center; }
 .active-focus-layer-outgoing { pointer-events: none; }
-.active-focus-enter-next { animation: active-focus-enter-next 480ms cubic-bezier(.4, 0, .2, 1) both; }
-.active-focus-exit-next { animation: active-focus-exit-next 480ms cubic-bezier(.4, 0, .2, 1) both; }
-.active-focus-enter-previous { animation: active-focus-enter-previous 480ms cubic-bezier(.4, 0, .2, 1) both; }
-.active-focus-exit-previous { animation: active-focus-exit-previous 480ms cubic-bezier(.4, 0, .2, 1) both; }
-@keyframes active-focus-enter-next { 0%, 35% { opacity: 0; transform: translateX(48px); } 100% { opacity: 1; transform: translateX(0); } }
-@keyframes active-focus-exit-next { 0% { opacity: 1; transform: translateX(0); } 55%, 100% { opacity: 0; transform: translateX(-48px); } }
-@keyframes active-focus-enter-previous { 0%, 35% { opacity: 0; transform: translateX(-48px); } 100% { opacity: 1; transform: translateX(0); } }
-@keyframes active-focus-exit-previous { 0% { opacity: 1; transform: translateX(0); } 55%, 100% { opacity: 0; transform: translateX(48px); } }
-@keyframes active-focus-enter-reduced { from { opacity: 0; } to { opacity: 1; } }
-@keyframes active-focus-exit-reduced { from { opacity: 1; } to { opacity: 0; } }
+.active-focus-enter-next, .active-focus-enter-previous { animation: active-focus-fade-in 280ms cubic-bezier(.2, .7, .2, 1) both; }
+.active-focus-exit-next, .active-focus-exit-previous { animation: active-focus-fade-out 280ms linear both; }
+@keyframes active-focus-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes active-focus-fade-out { 0% { opacity: 1; } 65%, 100% { opacity: 0; } }
 .active-focus-carousel { position: absolute; inset: 0; z-index: 3; opacity: 0; pointer-events: none; transition: opacity 140ms ease; }
 .active-focus-graph:hover .active-focus-carousel, .active-focus-graph:focus-within .active-focus-carousel { opacity: 1; }
 .active-carousel-arrow { position: absolute; top: 50%; display: grid; place-items: center; width: 30px; height: 42px; padding: 0; border: 1px solid rgb(120 137 127 / 30%); border-radius: 6px; color: #41534a; background: rgb(255 255 255 / 88%); box-shadow: 0 2px 8px rgb(30 48 38 / 10%); cursor: pointer; pointer-events: auto; transform: translateY(-50%); transition: color 120ms ease, border-color 120ms ease, background 120ms ease; }
@@ -206,8 +200,7 @@ svg { width: 17px; height: 17px; flex: 0 0 auto; }
 
 @media (prefers-reduced-motion: reduce) {
   .active-focus-carousel, .active-carousel-arrow, .active-carousel-dot { transition: none; }
-  .active-focus-enter-next, .active-focus-enter-previous { animation: active-focus-enter-reduced 160ms ease-out both; transform: none; }
-  .active-focus-exit-next, .active-focus-exit-previous { animation: active-focus-exit-reduced 160ms ease-out both; transform: none; }
+  .active-focus-enter-next, .active-focus-enter-previous, .active-focus-exit-next, .active-focus-exit-previous { animation-duration: 160ms; }
 }
 
 .empty-state { display: grid; place-items: center; align-content: center; gap: 14px; min-height: 360px; padding: 36px; color: var(--muted); text-align: center; }

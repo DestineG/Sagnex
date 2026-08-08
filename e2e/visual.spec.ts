@@ -68,9 +68,9 @@ test('renders active cards and editor across desktop and mobile', async ({ page,
   await expect.poll(async () => Number(await nextActiveButton.evaluate((element) => getComputedStyle(element.parentElement!).opacity))).toBe(1);
   await nextActiveButton.click();
   const currentFocusLayer = activeCard.locator('.active-focus-layer-current');
-  expect(await currentFocusLayer.evaluate((element) => getComputedStyle(element).animationDuration)).toBe('0.48s');
+  expect(await currentFocusLayer.evaluate((element) => getComputedStyle(element).animationDuration)).toBe('0.28s');
   await expect(currentFocusLayer.locator('.active-focus-node')).toHaveAttribute('aria-label', '内容校对，已暂停');
-  await page.waitForTimeout(180);
+  await page.waitForTimeout(110);
   await activeCard.screenshot({ path: 'test-results/active-transition.png' });
   await expect(activeCard.locator('.active-focus-layer-outgoing')).toHaveCount(0);
   await expect(activeCard.locator('.active-focus-layer-current .active-focus-edges path')).toHaveCount(2);

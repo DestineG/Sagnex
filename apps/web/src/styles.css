@@ -163,14 +163,14 @@ svg { width: 17px; height: 17px; flex: 0 0 auto; }
 .active-focus-graph-svg { display: block; width: 100%; height: 100%; }
 .active-focus-layer { transform-box: view-box; transform-origin: center; }
 .active-focus-layer-outgoing { pointer-events: none; }
-.active-focus-enter-next { animation: active-focus-enter-next 200ms cubic-bezier(.2, .75, .25, 1) both; }
-.active-focus-exit-next { animation: active-focus-exit-next 200ms cubic-bezier(.2, .75, .25, 1) both; }
-.active-focus-enter-previous { animation: active-focus-enter-previous 200ms cubic-bezier(.2, .75, .25, 1) both; }
-.active-focus-exit-previous { animation: active-focus-exit-previous 200ms cubic-bezier(.2, .75, .25, 1) both; }
-@keyframes active-focus-enter-next { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: translateX(0); } }
-@keyframes active-focus-exit-next { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(-12px); } }
-@keyframes active-focus-enter-previous { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: translateX(0); } }
-@keyframes active-focus-exit-previous { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(12px); } }
+.active-focus-enter-next { animation: active-focus-enter-next 360ms cubic-bezier(.22, 1, .36, 1) both; }
+.active-focus-exit-next { animation: active-focus-exit-next 360ms cubic-bezier(.22, 1, .36, 1) both; }
+.active-focus-enter-previous { animation: active-focus-enter-previous 360ms cubic-bezier(.22, 1, .36, 1) both; }
+.active-focus-exit-previous { animation: active-focus-exit-previous 360ms cubic-bezier(.22, 1, .36, 1) both; }
+@keyframes active-focus-enter-next { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes active-focus-exit-next { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(-20px); } }
+@keyframes active-focus-enter-previous { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes active-focus-exit-previous { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(20px); } }
 .active-focus-carousel { position: absolute; inset: 0; z-index: 3; opacity: 0; pointer-events: none; transition: opacity 140ms ease; }
 .active-focus-graph:hover .active-focus-carousel, .active-focus-graph:focus-within .active-focus-carousel { opacity: 1; }
 .active-carousel-arrow { position: absolute; top: 50%; display: grid; place-items: center; width: 30px; height: 42px; padding: 0; border: 1px solid rgb(120 137 127 / 30%); border-radius: 6px; color: #41534a; background: rgb(255 255 255 / 88%); box-shadow: 0 2px 8px rgb(30 48 38 / 10%); cursor: pointer; pointer-events: auto; transform: translateY(-50%); transition: color 120ms ease, border-color 120ms ease, background 120ms ease; }

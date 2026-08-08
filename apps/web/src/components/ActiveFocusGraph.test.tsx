@@ -1,5 +1,5 @@
 import type { Dependency, Task } from '@sagnex/contracts';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { ActiveFocusGraph } from './ActiveFocusGraph';
@@ -42,19 +42,26 @@ describe('ActiveFocusGraph', () => {
     await userEvent.click(within(container).getByRole('button', { name: '下一个活跃任务' }));
     expect(within(container).getByText('后续任务')).toBeInTheDocument();
     expect(container.querySelector('.active-focus-node')).toHaveAttribute('aria-label', '后续任务，已暂停');
+    expect(container.querySelector('.active-focus-layer-current')).toHaveClass('active-focus-enter-next');
+    expect(container.querySelector('.active-focus-layer-outgoing')).toHaveClass('active-focus-exit-next');
+    expect(within(container).getByRole('button', { name: '下一个活跃任务' })).toBeDisabled();
     expect(onTaskClick).not.toHaveBeenCalled();
     expect(cardClick).not.toHaveBeenCalled();
 
+    fireEvent.animationEnd(container.querySelector('.active-focus-layer-outgoing')!);
     await userEvent.click(within(container).getByRole('button', { name: '下一个活跃任务' }));
     expect(container.querySelector('.active-focus-node')).toHaveAttribute('aria-label', '当前任务，进行中');
+    fireEvent.animationEnd(container.querySelector('.active-focus-layer-outgoing')!);
     await userEvent.click(within(container).getByRole('button', { name: '上一个活跃任务' }));
     expect(container.querySelector('.active-focus-node')).toHaveAttribute('aria-label', '后续任务，已暂停');
+    expect(container.querySelector('.active-focus-layer-current')).toHaveClass('active-focus-enter-previous');
   });
 
   it('selects a task from the position dots and hides controls for a single active task', async () => {
     const { container, rerender } = render(<ActiveFocusGraph tasks={[focus, predecessor, successor]} dependencies={dependencies} focusTaskId={focus.id} />);
     await userEvent.click(within(container).getByRole('button', { name: '查看活跃任务 2：后续任务' }));
     expect(container.querySelector('.active-focus-node')).toHaveAttribute('aria-label', '后续任务，已暂停');
+    fireEvent.animationEnd(container.querySelector('.active-focus-layer-outgoing')!);
 
     rerender(<ActiveFocusGraph tasks={[focus, predecessor]} dependencies={dependencies.slice(0, 1)} focusTaskId={focus.id} />);
     expect(within(container).queryByRole('button', { name: '下一个活跃任务' })).not.toBeInTheDocument();
@@ -71,5 +78,17 @@ describe('ActiveFocusGraph', () => {
     const { container } = render(<ActiveFocusGraph tasks={activeTasks} dependencies={[]} focusTaskId={activeTasks[0]!.id} />);
     expect(container.querySelectorAll('.active-carousel-dot')).toHaveLength(5);
     expect(container.querySelectorAll('.active-carousel-more')).toHaveLength(1);
+  });
+
+  it('opens the event from blank canvas space without changing node navigation', async () => {
+    const onCanvasClick = vi.fn();
+    const onTaskClick = vi.fn();
+    const { container } = render(<ActiveFocusGraph tasks={[focus, predecessor, successor]} dependencies={dependencies} focusTaskId={focus.id} onCanvasClick={onCanvasClick} onTaskClick={onTaskClick} />);
+
+    fireEvent.click(container.querySelector('.active-focus-graph-svg')!);
+    expect(onCanvasClick).toHaveBeenCalledOnce();
+    await userEvent.click(within(container).getByRole('button', { name: '当前任务，进行中' }));
+    expect(onTaskClick).toHaveBeenCalledWith(focus.id);
+    expect(onCanvasClick).toHaveBeenCalledOnce();
   });
 });

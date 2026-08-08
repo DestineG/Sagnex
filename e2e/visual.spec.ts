@@ -62,11 +62,14 @@ test('renders active cards and editor across desktop and mobile', async ({ page,
   await expect(activeCard.getByLabel('1 个暂停任务')).toBeVisible();
   const nextActiveButton = activeCard.getByRole('button', { name: '下一个活跃任务' });
   expect(Number(await nextActiveButton.evaluate((element) => getComputedStyle(element.parentElement!).opacity))).toBe(0);
-  await activeCard.locator('.active-focus-graph').hover();
+  const focusGraphBox = await activeCard.locator('.active-focus-graph').boundingBox();
+  expect(focusGraphBox).not.toBeNull();
+  await page.mouse.move(focusGraphBox!.x + focusGraphBox!.width / 2, focusGraphBox!.y + 18);
   await expect.poll(async () => Number(await nextActiveButton.evaluate((element) => getComputedStyle(element.parentElement!).opacity))).toBe(1);
   await nextActiveButton.click();
-  await expect(activeCard.locator('.active-focus-node')).toHaveAttribute('aria-label', '内容校对，已暂停');
-  await expect(activeCard.locator('.active-focus-edges path')).toHaveCount(2);
+  await expect(activeCard.locator('.active-focus-layer-current .active-focus-node')).toHaveAttribute('aria-label', '内容校对，已暂停');
+  await expect(activeCard.locator('.active-focus-layer-outgoing')).toHaveCount(0);
+  await expect(activeCard.locator('.active-focus-layer-current .active-focus-edges path')).toHaveCount(2);
   await page.locator('.active-export').evaluate((element) => element.classList.add('exporting'));
   await expect(activeCard.locator('.active-focus-carousel')).toHaveCSS('display', 'none');
   await page.locator('.active-export').evaluate((element) => element.classList.remove('exporting'));
@@ -81,7 +84,7 @@ test('renders active cards and editor across desktop and mobile', async ({ page,
   const activeDownload = await activeDownloadPromise;
   await activeDownload.saveAs('test-results/active-export.png');
   expect((await stat('test-results/active-export.png')).size).toBeGreaterThan(5_000);
-  await expect(activeCard.locator('.active-focus-node')).toHaveAttribute('aria-label', '内容校对，已暂停');
+  await expect(activeCard.locator('.active-focus-layer-current .active-focus-node')).toHaveAttribute('aria-label', '内容校对，已暂停');
   await page.goto('/events');
   const eventTile = page.locator('.event-tile').filter({ hasText: eventTitle });
   await expect(eventTile.locator('.status-overview-node')).toHaveCount(4);

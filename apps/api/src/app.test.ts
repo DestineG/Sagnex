@@ -48,6 +48,20 @@ describe('API', () => {
     expect((await app.inject({ method: 'GET', url: `/api/tasks/${task.id}/history` })).statusCode).toBe(404);
   });
 
+  it('creates a validated successor task with its dependency', async () => {
+    const created = await app.inject({ method: 'POST', url: '/api/events', payload: { title: '任务链', description: '', labelIds: [] } });
+    const sourceResponse = await app.inject({ method: 'POST', url: `/api/events/${created.json().id}/tasks`, payload: { title: '起点', description: '', positionX: 40, positionY: 80 } });
+    const source = sourceResponse.json();
+    const successor = await app.inject({ method: 'POST', url: `/api/tasks/${source.id}/successors`, payload: { title: '后继', description: '', positionX: 310, positionY: 80 } });
+    expect(successor.statusCode, successor.body).toBe(201);
+    expect(successor.json()).toMatchObject({
+      task: { title: '后继', eventId: created.json().id },
+      dependency: { sourceTaskId: source.id }
+    });
+    const invalid = await app.inject({ method: 'POST', url: `/api/tasks/${source.id}/successors`, payload: { title: '', description: '' } });
+    expect(invalid.statusCode).toBe(400);
+  });
+
   it('creates, lists, and deletes task comments', async () => {
     const created = await app.inject({ method: 'POST', url: '/api/events', payload: { title: '评论事件', description: '', labelIds: [] } });
     const taskResponse = await app.inject({ method: 'POST', url: `/api/events/${created.json().id}/tasks`, payload: { title: '任务', description: '', positionX: 0, positionY: 0 } });

@@ -22,7 +22,7 @@ export function EventsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [copyTarget, setCopyTarget] = useState<{ id: string; title: string } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
-  const { data: allEvents = [], isLoading } = useQuery({ queryKey: ['events', 'all'], queryFn: () => api.listEvents('?preview=full') });
+  const { data: allEvents = [], isLoading } = useQuery({ queryKey: ['events', 'all'], queryFn: () => api.listEvents('?preview=full'), refetchOnMount: 'always' });
   const { data: labels = [] } = useQuery({ queryKey: ['labels'], queryFn: api.listLabels });
   const events = useMemo(() => allEvents.filter((event) => {
     if (status === 'archived' ? !event.archivedAt : event.archivedAt) return false;

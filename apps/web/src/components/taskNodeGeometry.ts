@@ -71,10 +71,10 @@ function candidatePositions(center: FlowPosition, radiusLimit: number): FlowPosi
   return positions;
 }
 
-export function findFreeTaskPosition(center: FlowPosition, nodes: PositionedNode[], viewport: FlowViewportBounds): FlowPosition {
+export function findFreeTaskPosition(center: FlowPosition, nodes: PositionedNode[], viewport?: FlowViewportBounds): FlowPosition {
   const candidates = candidatePositions(center, Math.max(8, nodes.length + 2));
   const available = (position: FlowPosition) => !nodes.some((node) => overlaps(position, node));
-  return candidates.find((position) => isInsideViewport(position, viewport) && available(position))
+  return candidates.find((position) => (!viewport || isInsideViewport(position, viewport)) && available(position))
     ?? candidates.find(available)
     ?? candidates[candidates.length - 1]!;
 }

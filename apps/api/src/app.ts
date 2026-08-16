@@ -102,6 +102,10 @@ export function createApp(context: DatabaseContext, options: { fetcher?: typeof 
     const { eventId } = eventIdParamsSchema.parse(request.params);
     return reply.status(201).send(await store.createTask(eventId, createTaskInputSchema.parse(request.body)));
   });
+  app.post('/api/tasks/:taskId/successors', async (request, reply) => {
+    const { taskId } = taskIdParamsSchema.parse(request.params);
+    return reply.status(201).send(await store.createSuccessorTask(taskId, createTaskInputSchema.parse(request.body)));
+  });
   app.patch('/api/tasks/:taskId', async (request) => store.updateTask(taskIdParamsSchema.parse(request.params).taskId, updateTaskInputSchema.parse(request.body)));
   app.delete('/api/tasks/:taskId', async (request, reply) => {
     await store.deleteTask(taskIdParamsSchema.parse(request.params).taskId);

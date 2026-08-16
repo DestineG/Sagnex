@@ -251,7 +251,7 @@ function CanvasMiniMap({ nodes, edges, canvasWidth, canvasHeight }: { nodes: Tas
   </div>;
 }
 
-function TaskDialog({ onClose, onCreate }: { onClose: () => void; onCreate: (value: { title: string; description: string }) => Promise<void> }) {
+function TaskDialog({ successor, onClose, onCreate }: { successor?: boolean; onClose: () => void; onCreate: (value: { title: string; description: string }) => Promise<void> }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [busy, setBusy] = useState(false);
@@ -262,7 +262,7 @@ function TaskDialog({ onClose, onCreate }: { onClose: () => void; onCreate: (val
     setBusy(true);
     try { await onCreate({ title: title.trim(), description: description.trim() }); } catch (cause) { setError(cause instanceof Error ? cause.message : '创建失败'); setBusy(false); }
   }
-  return <Dialog title="新建任务" onClose={onClose} onSubmit={submit} submitLabel="添加到画布" busy={busy}>
+  return <Dialog title={successor ? '新建后继任务' : '新建任务'} onClose={onClose} onSubmit={submit} submitLabel={successor ? '创建后继任务' : '添加到画布'} busy={busy}>
     <label className="field"><span>标题</span><input autoFocus value={title} onChange={(event) => setTitle(event.target.value)} maxLength={160} placeholder="任务名称" /></label>
     <label className="field"><span>简介</span><textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} maxLength={2000} placeholder="可选" /></label>
     {error && <p className="error-banner">{error}</p>}
@@ -333,7 +333,7 @@ function Editor({ graph, labels, onExportJson, onArchive, onRestoreEvent, onCopy
   const [exportOpen, setExportOpen] = useState(false);
   const [eventActionsOpen, setEventActionsOpen] = useState(false);
   const [copyOpen, setCopyOpen] = useState(false);
-  const [taskDialog, setTaskDialog] = useState(false);
+  const [taskDialog, setTaskDialog] = useState<{ sourceTaskId: string | null } | null>(null);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState('');
   const flowCanvasRef = useRef<HTMLDivElement>(null);
@@ -381,27 +381,55 @@ function Editor({ graph, labels, onExportJson, onArchive, onRestoreEvent, onCopy
   const { data: history = [] } = useQuery({ queryKey: ['task-history', selectedTaskId], queryFn: () => api.getTaskHistory(selectedTaskId!), enabled: Boolean(selectedTaskId) });
   const { data: comments = [] } = useQuery({ queryKey: ['task-comments', selectedTaskId], queryFn: () => api.listTaskComments(selectedTaskId!), enabled: Boolean(selectedTaskId) });
   const createTask = useMutation({
-    mutationFn: (value: { title: string; description: string }) => {
+    mutationFn: ({ value, sourceTaskId }: { value: { title: string; description: string }; sourceTaskId: string | null }) => {
       const visibleBounds = {
         x: -viewport.x / viewport.zoom,
         y: -viewport.y / viewport.zoom,
         width: canvasSize.width / viewport.zoom,
         height: canvasSize.height / viewport.zoom
       };
+      const sourceNode = sourceTaskId ? nodes.find((node) => node.id === sourceTaskId) : undefined;
+      if (sourceTaskId && !sourceNode) throw new Error('选中的任务不存在');
+      const preferredCenter = sourceNode
+        ? { x: sourceNode.position.x + FLOW_NODE_WIDTH * 1.5 + 90, y: sourceNode.position.y + FLOW_NODE_HEIGHT / 2 }
+        : { x: visibleBounds.x + visibleBounds.width / 2, y: visibleBounds.y + visibleBounds.height / 2 };
       const position = findFreeTaskPosition(
-        { x: visibleBounds.x + visibleBounds.width / 2, y: visibleBounds.y + visibleBounds.height / 2 },
+        preferredCenter,
         nodes,
-        visibleBounds
+        sourceTaskId ? undefined : visibleBounds
       );
-      return api.createTask(graph.id, { ...value, positionX: position.x, positionY: position.y });
+      const input = { ...value, positionX: position.x, positionY: position.y };
+      return sourceTaskId
+        ? api.createSuccessorTask(sourceTaskId, input).then((result) => result.task)
+        : api.createTask(graph.id, input);
     },
     onSuccess: async (task) => {
-      setTaskDialog(false);
+      setTaskDialog(null);
       await refresh();
       centeredTaskId.current = null;
       setSearchParams({ task: task.id });
     }
   });
+  useEffect(() => {
+    function handleCanvasShortcut(event: KeyboardEvent) {
+      if (event.defaultPrevented || event.repeat || taskDialog || graph.archivedAt) return;
+      const target = event.target;
+      const canvas = flowCanvasRef.current;
+      if (!(target instanceof HTMLElement) || !canvas?.contains(target)) return;
+      if (event.key === 'Escape' && selectedTaskId) {
+        event.preventDefault();
+        setSearchParams({});
+        target.blur();
+        return;
+      }
+      if (event.key !== 'Tab' || event.shiftKey || event.ctrlKey || event.metaKey || event.altKey || !selectedTaskId || createTask.isPending) return;
+      if (target.closest('input, textarea, select, button, [contenteditable="true"]')) return;
+      event.preventDefault();
+      setTaskDialog({ sourceTaskId: selectedTaskId });
+    }
+    window.addEventListener('keydown', handleCanvasShortcut, true);
+    return () => window.removeEventListener('keydown', handleCanvasShortcut, true);
+  }, [createTask.isPending, graph.archivedAt, selectedTaskId, setSearchParams, taskDialog]);
   const updateEvent = useMutation({ mutationFn: (value: { title?: string; description?: string; labelIds?: string[] }) => api.updateEvent(graph.id, value), onSuccess: refresh, onError: (cause) => setError(cause.message) });
   const updateTask = useMutation({ mutationFn: ({ id, value }: { id: string; value: { title?: string; description?: string } }) => api.updateTask(id, value), onSuccess: refresh, onError: (cause) => setError(cause.message) });
   const transition = useMutation({ mutationFn: ({ id, status, confirmed = false, comment }: { id: string; status: TaskStatus; confirmed?: boolean; comment: string; afterSuccess: () => void }) => api.transitionTask(id, status, confirmed, comment), onSuccess: async (_result, variables) => { variables.afterSuccess(); await refresh(); if (selectedTaskId) await queryClient.invalidateQueries({ queryKey: ['task-history', selectedTaskId] }); }, onError: async (cause, variables) => {
@@ -517,7 +545,7 @@ function Editor({ graph, labels, onExportJson, onArchive, onRestoreEvent, onCopy
   return <div className="editor-shell">
     <div className="editor-commandbar">
       <div className="commandbar-group">
-        {!graph.archivedAt && <button className="button primary" onClick={() => setTaskDialog(true)}><Plus />任务</button>}
+        {!graph.archivedAt && <button className="button primary" onClick={() => setTaskDialog({ sourceTaskId: null })}><Plus />任务</button>}
         {!graph.archivedAt && <button className="button" onClick={autoLayout}><LayoutTemplate />自动布局</button>}
         <button className="button" onClick={() => void fitView({ padding: 0.25, duration: 250, maxZoom: 1.2 })}><Maximize2 />适配视图</button>
       </div>
@@ -547,7 +575,7 @@ function Editor({ graph, labels, onExportJson, onArchive, onRestoreEvent, onCopy
         <ReactFlow
           nodes={nodes} edges={edges} nodeTypes={nodeTypes}
           onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
-          onNodeClick={(_event, node) => setSearchParams({ task: node.id })}
+          onNodeClick={(event, node) => { (event.currentTarget as HTMLElement).focus(); setSearchParams({ task: node.id }); }}
           onPaneClick={() => setSearchParams({})}
           onNodeDragStop={(_event, node) => void saveLayout([{ ...node } as TaskFlowNode]).catch((cause: Error) => setError(cause.message))}
           onConnect={(connection) => createDependency.mutate(connection)}
@@ -570,7 +598,7 @@ function Editor({ graph, labels, onExportJson, onArchive, onRestoreEvent, onCopy
     <aside className="inspector">
       {selectedTask ? <TaskInspector key={selectedTask.id} graph={graph} task={selectedTask} history={history} comments={comments} onUpdate={(value) => updateTask.mutate({ id: selectedTask.id, value })} onTransition={(status, comment, afterSuccess) => transition.mutate({ id: selectedTask.id, status, comment, afterSuccess })} onCreateComment={(content, afterSuccess) => createComment.mutate({ taskId: selectedTask.id, content, afterSuccess })} onDeleteComment={(id) => { if (window.confirm('删除这条任务评论？')) removeComment.mutate(id); }} onSelectTask={(id) => setSearchParams({ task: id })} transitionPending={transition.isPending} commentPending={createComment.isPending} deletePending={removeTask.isPending} onDelete={() => requestTaskDeletion(selectedTask.id)} /> : <EventInspector key={graph.id} graph={graph} labels={labels} onUpdate={(value) => updateEvent.mutate(value)} />}
     </aside>
-    {taskDialog && <TaskDialog onClose={() => setTaskDialog(false)} onCreate={(value) => createTask.mutateAsync(value).then(() => undefined)} />}
+    {taskDialog && <TaskDialog successor={Boolean(taskDialog.sourceTaskId)} onClose={() => setTaskDialog(null)} onCreate={(value) => createTask.mutateAsync({ value, sourceTaskId: taskDialog.sourceTaskId }).then(() => undefined)} />}
     {copyOpen && <CopyEventDialog sourceTitle={graph.title} onClose={() => setCopyOpen(false)} onCopy={onCopy} />}
     <div className="sr-only" aria-live="polite">{updateEvent.isPending || updateTask.isPending ? '正在保存' : '已保存'}</div>
     </div>

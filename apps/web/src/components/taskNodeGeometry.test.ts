@@ -20,4 +20,12 @@ describe('findFreeTaskPosition', () => {
     expect(result.x + FLOW_NODE_WIDTH).toBeLessThanOrEqual(viewport.width);
     expect(result.y + FLOW_NODE_HEIGHT).toBeLessThanOrEqual(viewport.height);
   });
+
+  it('can find the nearest free position without constraining it to the viewport', () => {
+    const center = { x: 1200, y: 400 };
+    const occupied = { x: center.x - FLOW_NODE_WIDTH / 2, y: center.y - FLOW_NODE_HEIGHT / 2 };
+    const result = findFreeTaskPosition(center, [{ position: occupied }]);
+    expect(result).not.toEqual(occupied);
+    expect(result.x).toBeGreaterThan(occupied.x);
+  });
 });

@@ -121,7 +121,9 @@ test('completes the local event workflow', async ({ page, request }) => {
   await page.getByRole('button', { name: '创建并规划' }).click();
   await expect(page).toHaveURL(/\/events\/[0-9a-f-]+$/);
   const eventId = page.url().split('/events/')[1]!;
+  const eventListRefresh = page.waitForResponse((response) => response.url().includes('/api/events?preview=full') && response.request().method() === 'GET');
   await page.getByRole('button', { name: '返回事件列表' }).click();
+  await eventListRefresh;
   await expect(page).toHaveURL(/\/events$/);
   await page.locator('.event-tile').filter({ hasText: eventTitle }).click();
 
@@ -130,17 +132,27 @@ test('completes the local event workflow', async ({ page, request }) => {
   await page.getByRole('button', { name: '添加到画布' }).click();
   await expect(page.locator('.inspector input').first()).toHaveValue('前置任务');
 
-  await page.getByRole('button', { name: '任务', exact: true }).click();
+  const sourceNode = page.locator('.task-node').filter({ hasText: '前置任务' });
+  await sourceNode.click();
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('heading', { name: '新建后继任务' })).toBeVisible();
   await page.getByPlaceholder('任务名称').fill('后续任务');
-  await page.getByRole('button', { name: '添加到画布' }).click();
+  const successorResponse = page.waitForResponse((response) => response.url().endsWith('/successors') && response.request().method() === 'POST');
+  await page.getByRole('button', { name: '创建后继任务' }).click();
+  expect((await successorResponse).status()).toBe(201);
   await expect(page.locator('.inspector input').first()).toHaveValue('后续任务');
+
+  const inspectorTitle = page.locator('.inspector input').first();
+  await inspectorTitle.focus();
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('heading', { name: '新建后继任务' })).toHaveCount(0);
+  await expect(page.locator('.inspector textarea').first()).toBeFocused();
 
   const graphResponse = await request.get(`/api/events/${eventId}`);
   const graph = await graphResponse.json();
   const source = graph.tasks.find((task: { title: string }) => task.title === '前置任务');
   const target = graph.tasks.find((task: { title: string }) => task.title === '后续任务');
-  await request.post(`/api/events/${eventId}/dependencies`, { data: { sourceTaskId: source.id, targetTaskId: target.id } });
-  await page.reload();
+  expect(graph.dependencies).toEqual(expect.arrayContaining([expect.objectContaining({ sourceTaskId: source.id, targetTaskId: target.id })]));
 
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByLabel('本次状态备注（可选）').fill('开始处理后续任务');
@@ -190,7 +202,9 @@ test('completes the local event workflow', async ({ page, request }) => {
   await activeCard.getByRole('button', { name: '后续任务，进行中' }).click();
   await expect(page).toHaveURL(new RegExp(`task=${target.id}`));
   await expect(page.locator('.inspector input').first()).toHaveValue('后续任务');
-  await page.getByRole('button', { name: '返回活跃事件' }).click();
+  const activeListRefresh = page.waitForResponse((response) => response.url().includes('/api/events?active=true') && response.request().method() === 'GET');
+  await page.goBack();
+  await activeListRefresh;
   await expect(page).toHaveURL(/\/$/);
   await activeCard.getByRole('button', { name: '后续任务，进行中' }).click();
   const archiveResponse = page.waitForResponse((response) => response.url().endsWith(`/api/events/${eventId}/archive`));

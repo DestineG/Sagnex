@@ -303,6 +303,26 @@ export class SagnexStore {
     return row;
   }
 
+  async createSuccessorTask(sourceTaskId: string, input: CreateTaskInput): Promise<{ task: Task; dependency: Dependency }> {
+    const source = await this.requireTask(sourceTaskId);
+    await this.requireEditableEvent(source.eventId);
+    const timestamp = now();
+    const task: Task = {
+      id: crypto.randomUUID(), eventId: source.eventId, title: input.title, description: input.description,
+      status: 'not_started', positionX: input.positionX, positionY: input.positionY,
+      createdAt: timestamp, updatedAt: timestamp, statusChangedAt: timestamp
+    };
+    const dependency: Dependency = {
+      id: crypto.randomUUID(), eventId: source.eventId, sourceTaskId, targetTaskId: task.id, createdAt: timestamp
+    };
+    this.context.db.transaction((tx) => {
+      tx.insert(tasks).values(task).run();
+      tx.insert(dependencies).values(dependency).run();
+      tx.update(events).set({ updatedAt: timestamp }).where(eq(events.id, source.eventId)).run();
+    });
+    return { task, dependency };
+  }
+
   async updateTask(taskId: string, input: UpdateTaskInput): Promise<Task> {
     const task = await this.requireTask(taskId);
     await this.requireEditableEvent(task.eventId);

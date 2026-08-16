@@ -28,6 +28,18 @@ describe('SagnexStore', () => {
     expect(await store.getTaskHistory(task.id)).toHaveLength(2);
   });
 
+  it('creates a successor task and dependency together', async () => {
+    const event = await store.createEvent({ title: '任务链', description: '', labelIds: [] });
+    const source = await store.createTask(event.id, { title: '起点', description: '', positionX: 40, positionY: 80 });
+    const result = await store.createSuccessorTask(source.id, { title: '后继', description: '继续处理', positionX: 310, positionY: 80 });
+
+    expect(result.task).toMatchObject({ eventId: event.id, title: '后继', status: 'not_started', positionX: 310, positionY: 80 });
+    expect(result.dependency).toMatchObject({ eventId: event.id, sourceTaskId: source.id, targetTaskId: result.task.id });
+    const graph = await store.getEvent(event.id);
+    expect(graph.tasks.map((task) => task.title)).toEqual(['起点', '后继']);
+    expect(graph.dependencies).toEqual([expect.objectContaining({ sourceTaskId: source.id, targetTaskId: result.task.id })]);
+  });
+
   it('creates shallow planning copies and deep history copies', async () => {
     const label = await store.createLabel({ name: '模板', color: '#176b4b' });
     const source = await store.createEvent({ title: '源事件', description: '保留简介', labelIds: [label.id] });

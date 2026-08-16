@@ -15,7 +15,7 @@ export function ActivePage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState('');
-  const { data: events = [], isLoading } = useQuery({ queryKey: ['events', 'active'], queryFn: () => api.listEvents('?active=true') });
+  const { data: events = [], isLoading } = useQuery({ queryKey: ['events', 'active'], queryFn: () => api.listEvents('?active=true'), refetchOnMount: 'always' });
   const { data: labels = [] } = useQuery({ queryKey: ['labels'], queryFn: api.listLabels });
   const createEvent = useMutation({
     mutationFn: api.createEvent,

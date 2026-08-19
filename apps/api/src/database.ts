@@ -6,7 +6,7 @@ import * as schema from './schema.js';
 
 export type SagnexDatabase = BetterSQLite3Database<typeof schema>;
 
-const DATABASE_VERSION = 7;
+const DATABASE_VERSION = 8;
 const validTaskStatuses = ['not_started', 'in_progress', 'paused', 'completed'] as const;
 
 const migrationSql = `
@@ -73,10 +73,29 @@ CREATE TABLE IF NOT EXISTS webdav_settings (
   remote_path TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS auth_codes (
+  id TEXT PRIMARY KEY,
+  email TEXT NOT NULL,
+  code_hash TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  consumed_at TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS sessions (
+  id TEXT PRIMARY KEY,
+  email TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  last_seen_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  absolute_expires_at TEXT NOT NULL
+);
 CREATE INDEX IF NOT EXISTS tasks_event_idx ON tasks(event_id);
 CREATE INDEX IF NOT EXISTS dependencies_event_idx ON dependencies(event_id);
 CREATE INDEX IF NOT EXISTS state_changes_task_idx ON task_state_changes(task_id, changed_at DESC);
 CREATE INDEX IF NOT EXISTS task_comments_task_idx ON task_comments(task_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS auth_codes_email_idx ON auth_codes(email, created_at DESC);
+CREATE INDEX IF NOT EXISTS sessions_expires_idx ON sessions(expires_at);
 `;
 
 function migrateDatabase(raw: Database.Database, currentVersion: number) {
@@ -106,6 +125,33 @@ function migrateDatabase(raw: Database.Database, currentVersion: number) {
         CREATE INDEX IF NOT EXISTS task_comments_task_idx ON task_comments(task_id, created_at DESC);
       `);
       raw.pragma('user_version = 7');
+    })();
+  }
+
+  if (currentVersion < 8) {
+    raw.transaction(() => {
+      raw.exec(`
+        CREATE TABLE IF NOT EXISTS auth_codes (
+          id TEXT PRIMARY KEY,
+          email TEXT NOT NULL,
+          code_hash TEXT NOT NULL,
+          expires_at TEXT NOT NULL,
+          attempts INTEGER NOT NULL DEFAULT 0,
+          consumed_at TEXT,
+          created_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS sessions (
+          id TEXT PRIMARY KEY,
+          email TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          last_seen_at TEXT NOT NULL,
+          expires_at TEXT NOT NULL,
+          absolute_expires_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS auth_codes_email_idx ON auth_codes(email, created_at DESC);
+        CREATE INDEX IF NOT EXISTS sessions_expires_idx ON sessions(expires_at);
+      `);
+      raw.pragma('user_version = 8');
     })();
   }
 

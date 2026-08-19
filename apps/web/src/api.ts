@@ -45,10 +45,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (init?.body !== undefined) headers.set('Content-Type', 'application/json');
   const response = await fetch(path, {
     ...init,
+    credentials: 'include',
     headers
   });
   if (!response.ok) {
     const payload = await response.json().catch(() => ({ message: '请求失败' }));
+    if (response.status === 401) window.dispatchEvent(new Event('sagnex:auth-expired'));
     throw new ApiError(payload.message ?? '请求失败', response.status, payload.details);
   }
   if (response.status === 204) return undefined as T;
@@ -58,6 +60,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 const json = (value: unknown): RequestInit => ({ body: JSON.stringify(value) });
 
 export const api = {
+  authStatus: () => request<{ authRequired: boolean; authenticated: boolean; email: string | null; expiresAt: string | null }>('/api/auth/status'),
+  requestLoginCode: (email: string) => request<{ ok: true; expiresAt: string }>('/api/auth/request-code', { method: 'POST', ...json({ email }) }),
+  verifyLoginCode: (email: string, code: string) => request<{ authRequired: boolean; authenticated: boolean; email: string; expiresAt: string }>('/api/auth/verify', { method: 'POST', ...json({ email, code }) }),
+  logout: () => request<{ ok: true }>('/api/auth/logout', { method: 'POST' }),
   listEvents: (query = '') => request<EventSummary[]>(`/api/events${query}`),
   getEvent: (id: string) => request<EventGraph>(`/api/events/${id}`),
   createEvent: (input: CreateEventInput) => request<EventGraph>('/api/events', { method: 'POST', ...json(input) }),

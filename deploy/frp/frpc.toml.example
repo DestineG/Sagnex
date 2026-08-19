@@ -1,0 +1,22 @@
+# Run this on the machine hosting Sagnex.
+serverAddr = "cloud.example.com"
+serverPort = 7000
+
+auth.method = "token"
+auth.token = "replace-with-the-same-long-random-token"
+
+transport.tls.enable = true
+
+[[proxies]]
+name = "sagnex-http"
+type = "tcp"
+localIP = "127.0.0.1"
+localPort = 80
+remotePort = 80
+
+[[proxies]]
+name = "sagnex-https"
+type = "tcp"
+localIP = "127.0.0.1"
+localPort = 443
+remotePort = 443

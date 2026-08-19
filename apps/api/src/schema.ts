@@ -1,4 +1,4 @@
-import { real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { integer, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 export const events = sqliteTable('events', {
   id: text('id').primaryKey(),
@@ -66,4 +66,23 @@ export const webdavSettings = sqliteTable('webdav_settings', {
   username: text('username').notNull(),
   remotePath: text('remote_path').notNull(),
   updatedAt: text('updated_at').notNull()
+});
+
+export const authCodes = sqliteTable('auth_codes', {
+  id: text('id').primaryKey(),
+  email: text('email').notNull(),
+  codeHash: text('code_hash').notNull(),
+  expiresAt: text('expires_at').notNull(),
+  attempts: integer('attempts').notNull().default(0),
+  consumedAt: text('consumed_at'),
+  createdAt: text('created_at').notNull()
+});
+
+export const sessions = sqliteTable('sessions', {
+  id: text('id').primaryKey(),
+  email: text('email').notNull(),
+  createdAt: text('created_at').notNull(),
+  lastSeenAt: text('last_seen_at').notNull(),
+  expiresAt: text('expires_at').notNull(),
+  absoluteExpiresAt: text('absolute_expires_at').notNull()
 });

@@ -96,4 +96,22 @@ describe('API', () => {
     expect(response.statusCode).toBe(403);
     expect(response.json()).toEqual({ message: 'Origin not allowed' });
   });
+
+  it('requires a one-time email code when authentication is enabled', async () => {
+    let sentCode = '';
+    await app.close();
+    context.close();
+    context = createDatabase(':memory:');
+    app = createApp(context, { auth: { allowedEmail: 'owner@example.com', sendCode: async (_email, code) => { sentCode = code; } } });
+
+    expect((await app.inject({ method: 'GET', url: '/api/events' })).statusCode).toBe(401);
+    const requested = await app.inject({ method: 'POST', url: '/api/auth/request-code', payload: { email: 'owner@example.com' } });
+    expect(requested.statusCode, requested.body).toBe(200);
+    const verified = await app.inject({ method: 'POST', url: '/api/auth/verify', payload: { email: 'owner@example.com', code: sentCode } });
+    expect(verified.statusCode, verified.body).toBe(200);
+    const cookie = verified.headers['set-cookie'];
+    expect(cookie).toBeTruthy();
+    expect((await app.inject({ method: 'GET', url: '/api/events', headers: { cookie: String(cookie).split(';')[0] } })).statusCode).toBe(200);
+    expect((await app.inject({ method: 'POST', url: '/api/auth/verify', payload: { email: 'owner@example.com', code: sentCode } })).statusCode).toBe(400);
+  });
 });

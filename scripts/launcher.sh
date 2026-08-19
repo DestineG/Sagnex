@@ -5,11 +5,21 @@ root_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 config_dir="$root_dir/config"
 config_path="$config_dir/sagnex.env"
 config_example_path="$config_dir/sagnex.env.example"
+caddyfile_path="$config_dir/Caddyfile"
+caddyfile_example_path="$config_dir/Caddyfile.example"
 
 copy_default_config() {
   mkdir -p "$config_dir"
   cp "$config_example_path" "$config_path"
+  cp "$caddyfile_example_path" "$caddyfile_path"
   printf 'Created configuration: %s\n' "$config_path"
+}
+
+ensure_caddyfile() {
+  if [[ ! -f "$caddyfile_path" ]]; then
+    cp "$caddyfile_example_path" "$caddyfile_path"
+    printf 'Created Caddy configuration: %s\n' "$caddyfile_path"
+  fi
 }
 
 config_action() {
@@ -17,6 +27,7 @@ config_action() {
     copy_default_config
     return
   fi
+  ensure_caddyfile
   if [[ ! -t 0 ]]; then
     printf 'Configuration already exists and was not replaced: %s\n' "$config_path"
     return
@@ -31,7 +42,10 @@ config_action() {
 }
 
 confirm_config_for_start() {
-  [[ -f "$config_path" ]] && return 0
+  if [[ -f "$config_path" ]]; then
+    ensure_caddyfile
+    return 0
+  fi
   if [[ ! -t 0 ]]; then
     echo 'Configuration is missing. Run ./sagnex.sh config before starting.' >&2
     return 1
@@ -73,12 +87,12 @@ docker_action() {
   case "$action" in
     start)
       compose_command up -d --build --remove-orphans --wait
-      printf 'Sagnex is running at http://%s\n' "$(compose_command port web 80)"
+      printf 'Sagnex is running at http://%s (LAN)\n' "$(compose_command port caddy 80)"
       ;;
     update)
       compose_command build --pull
       compose_command up -d --remove-orphans --wait
-      printf 'Sagnex was updated and is running at http://%s\n' "$(compose_command port web 80)"
+      printf 'Sagnex was updated and is running at http://%s (LAN)\n' "$(compose_command port caddy 80)"
       ;;
     stop)
       compose_command down --remove-orphans

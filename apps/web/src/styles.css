@@ -42,10 +42,25 @@ svg { width: 17px; height: 17px; flex: 0 0 auto; }
 .brand { display: flex; align-items: center; gap: 9px; padding: 0 9px 22px; color: #0e3c2b; font-size: 15px; font-weight: 750; }
 .brand img { width: 28px; height: 28px; }
 .sidebar nav { display: grid; gap: 4px; }
+.nav-logout { width: 100%; margin-top: 18px; border: 0; background: transparent; cursor: pointer; text-align: left; }
 .nav-link { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 8px 11px; border-radius: 6px; color: var(--muted-strong); text-decoration: none; transition: background 140ms ease, color 140ms ease; }
 .nav-link:hover { color: var(--text); background: var(--subtle); }
 .nav-link.active { color: var(--green-strong); background: var(--green-soft); font-weight: 600; }
 .main-content { min-width: 0; min-height: 100vh; }
+
+.auth-page { display: grid; place-items: center; min-height: 100vh; padding: 24px; background: var(--bg); }
+.auth-panel { width: min(100%, 420px); padding: 34px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: var(--shadow-popover); }
+.auth-mark { display: grid; place-items: center; width: 44px; height: 44px; margin-bottom: 18px; border-radius: 10px; background: var(--green-soft); }
+.auth-mark img { width: 28px; height: 28px; }
+.auth-panel .eyebrow { color: var(--green-strong); font-size: 12px; font-weight: 750; letter-spacing: .08em; }
+.auth-panel h1 { margin-top: 4px; }
+.auth-copy { margin-top: 8px; color: var(--muted); }
+.auth-form { display: grid; gap: 14px; margin-top: 24px; }
+.auth-form label { display: grid; gap: 6px; color: var(--muted-strong); font-size: 13px; font-weight: 600; }
+.auth-form input { width: 100%; min-height: 42px; padding: 9px 11px; border: 1px solid var(--line-strong); border-radius: 6px; outline: 0; background: var(--surface); color: var(--text); }
+.auth-form input:focus { border-color: var(--green); box-shadow: 0 0 0 3px var(--green-soft); }
+.subtle-button { background: var(--subtle); }
+.auth-message { margin-top: 14px; color: var(--muted-strong); font-size: 13px; }
 
 .page { min-height: 100vh; padding-bottom: 44px; }
 .page-head { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 34px 36px 24px; }

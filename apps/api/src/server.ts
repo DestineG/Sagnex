@@ -2,6 +2,7 @@ import { dirname, join, resolve } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { createApp } from './app.js';
+import { authOptionsFromEnvironment } from './auth.js';
 import { createDatabase } from './database.js';
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
@@ -16,7 +17,7 @@ const host = process.env.SAGNEX_API_HOST || '127.0.0.1';
 const port = Number(process.env.SAGNEX_API_PORT || 4784);
 
 const context = createDatabase(databasePath);
-const app = createApp(context, { backupDirectory });
+const app = createApp(context, { backupDirectory, auth: authOptionsFromEnvironment(process.env) });
 
 const close = async () => {
   await app.close();

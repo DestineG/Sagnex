@@ -17,11 +17,13 @@
     "drizzle-orm": "^0.44.7",
     "fast-xml-parser": "^5.10.1",
     "fastify": "^5.6.2",
+    "nodemailer": "^9.0.5",
     "sanitize-html": "^2.17.6",
     "zod": "^4.1.12"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
+    "@types/nodemailer": "^8.0.1",
     "@types/sanitize-html": "^2.16.1",
     "tsx": "^4.20.6",
     "vitest": "^4.0.8"

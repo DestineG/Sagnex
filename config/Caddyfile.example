@@ -1,0 +1,23 @@
+# Set SAGNEX_PUBLIC_DOMAIN to the real domain in config/sagnex.env.
+# Caddy obtains and renews the certificate for this domain automatically.
+{$SAGNEX_PUBLIC_DOMAIN} {
+    @api path /api/*
+    reverse_proxy @api api:4784 {
+        header_up Origin ""
+    }
+    reverse_proxy web:80
+}
+
+# Public HTTP requests are redirected to HTTPS.
+http://{$SAGNEX_PUBLIC_DOMAIN} {
+    redir https://{$SAGNEX_PUBLIC_DOMAIN}{uri} permanent
+}
+
+# Direct LAN access. Restrict host port 80 to the LAN with the host firewall.
+:80 {
+    @api path /api/*
+    reverse_proxy @api api:4784 {
+        header_up Origin ""
+    }
+    reverse_proxy web:80
+}

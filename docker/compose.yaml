@@ -16,6 +16,14 @@ services:
       SAGNEX_API_PORT: 4784
       SAGNEX_DATA_DIR: /data
       SAGNEX_BACKUP_DIR: /backups
+      SAGNEX_AUTH_EMAIL: ${SAGNEX_AUTH_EMAIL:-}
+      SAGNEX_SMTP_HOST: ${SAGNEX_SMTP_HOST:-}
+      SAGNEX_SMTP_PORT: ${SAGNEX_SMTP_PORT:-587}
+      SAGNEX_SMTP_USER: ${SAGNEX_SMTP_USER:-}
+      SAGNEX_SMTP_PASSWORD: ${SAGNEX_SMTP_PASSWORD:-}
+      SAGNEX_SMTP_FROM: ${SAGNEX_SMTP_FROM:-}
+      SAGNEX_SESSION_IDLE_DAYS: ${SAGNEX_SESSION_IDLE_DAYS:-14}
+      SAGNEX_SESSION_MAX_DAYS: ${SAGNEX_SESSION_MAX_DAYS:-30}
     user: "${SAGNEX_DOCKER_USER:-1000:1000}"
     volumes:
       - type: bind
@@ -48,8 +56,41 @@ services:
     depends_on:
       api:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/api/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 5s
+
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_healthy
     ports:
-      - "${SAGNEX_BIND_ADDRESS:-127.0.0.1}:${SAGNEX_WEB_PORT:-4173}:80"
+      - "${SAGNEX_CADDY_BIND_ADDRESS:-0.0.0.0}:${SAGNEX_CADDY_HTTP_PORT:-80}:80"
+      - "${SAGNEX_CADDY_BIND_ADDRESS:-0.0.0.0}:${SAGNEX_CADDY_HTTPS_PORT:-443}:443"
+    environment:
+      SAGNEX_PUBLIC_DOMAIN: ${SAGNEX_PUBLIC_DOMAIN:-sagnex.example.com}
+    volumes:
+      - type: bind
+        source: ${SAGNEX_CADDYFILE:-./config/Caddyfile}
+        target: /etc/caddy/Caddyfile
+        read_only: true
+      - type: bind
+        source: ${SAGNEX_CADDY_DATA_DIR:-./data/caddy}
+        target: /data
+        bind:
+          create_host_path: true
+      - type: bind
+        source: ${SAGNEX_CADDY_CONFIG_DIR:-./data/caddy-config}
+        target: /config
+        bind:
+          create_host_path: true
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/api/health"]
       interval: 10s

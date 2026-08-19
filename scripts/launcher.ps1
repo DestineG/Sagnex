@@ -4,12 +4,22 @@ $rootDirectory = Split-Path -Parent $PSScriptRoot
 $configDirectory = Join-Path $rootDirectory 'config'
 $configPath = Join-Path $configDirectory 'sagnex.env'
 $configExamplePath = Join-Path $configDirectory 'sagnex.env.example'
+$caddyfilePath = Join-Path $configDirectory 'Caddyfile'
+$caddyfileExamplePath = Join-Path $configDirectory 'Caddyfile.example'
 $composeFile = Join-Path $rootDirectory 'docker\compose.yaml'
 
 function Copy-DefaultConfig {
   New-Item -ItemType Directory -Path $configDirectory -Force | Out-Null
   Copy-Item -LiteralPath $configExamplePath -Destination $configPath -Force
+  Copy-Item -LiteralPath $caddyfileExamplePath -Destination $caddyfilePath -Force
   Write-Host "Created configuration: $configPath"
+}
+
+function Ensure-Caddyfile {
+  if (-not (Test-Path -LiteralPath $caddyfilePath)) {
+    Copy-Item -LiteralPath $caddyfileExamplePath -Destination $caddyfilePath
+    Write-Host "Created Caddy configuration: $caddyfilePath"
+  }
 }
 
 function Test-InteractiveInput {
@@ -21,6 +31,7 @@ function Invoke-ConfigAction {
     Copy-DefaultConfig
     return
   }
+  Ensure-Caddyfile
   if (-not (Test-InteractiveInput)) {
     Write-Host "Configuration already exists and was not replaced: $configPath"
     return
@@ -34,7 +45,7 @@ function Invoke-ConfigAction {
 }
 
 function Confirm-ConfigForStart {
-  if (Test-Path -LiteralPath $configPath) { return $true }
+  if (Test-Path -LiteralPath $configPath) { Ensure-Caddyfile; return $true }
   if (-not (Test-InteractiveInput)) {
     Write-Host 'Configuration is missing. Run sagnex.cmd config before starting.'
     return $false
@@ -93,14 +104,14 @@ function Invoke-DockerAction([string]$action) {
   switch ($action) {
     'start' {
       Invoke-Compose @('up', '-d', '--build', '--remove-orphans', '--wait')
-      $binding = (& docker compose --project-directory $rootDirectory --env-file $configPath -f $composeFile port web 80)
-      Write-Host "Sagnex is running at http://$binding"
+      $binding = (& docker compose --project-directory $rootDirectory --env-file $configPath -f $composeFile port caddy 80)
+      Write-Host "Sagnex is running at http://$binding (LAN)"
     }
     'update' {
       Invoke-Compose @('build', '--pull')
       Invoke-Compose @('up', '-d', '--remove-orphans', '--wait')
-      $binding = (& docker compose --project-directory $rootDirectory --env-file $configPath -f $composeFile port web 80)
-      Write-Host "Sagnex was updated and is running at http://$binding"
+      $binding = (& docker compose --project-directory $rootDirectory --env-file $configPath -f $composeFile port caddy 80)
+      Write-Host "Sagnex was updated and is running at http://$binding (LAN)"
     }
     'stop' {
       Invoke-Compose @('down', '--remove-orphans')

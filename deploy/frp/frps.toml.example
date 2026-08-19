@@ -1,0 +1,7 @@
+# Run this on the cloud server. The cloud server only relays TCP traffic.
+bindPort = 7000
+
+auth.method = "token"
+auth.token = "replace-with-a-long-random-token"
+
+# Keep the FRP dashboard disabled unless it is explicitly needed.

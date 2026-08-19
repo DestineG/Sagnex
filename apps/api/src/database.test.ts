@@ -25,7 +25,7 @@ describe('database migrations', () => {
     legacy.close();
 
     const context = createDatabase(path);
-    expect(context.raw.pragma('user_version', { simple: true })).toBe(7);
+    expect(context.raw.pragma('user_version', { simple: true })).toBe(8);
     expect(context.raw.prepare('SELECT id FROM tasks ORDER BY id').all()).toEqual([{ id: 'kept' }]);
     expect(context.raw.prepare('SELECT id FROM dependencies').all()).toEqual([]);
     expect(context.raw.prepare('SELECT id FROM task_state_changes').all()).toEqual([]);

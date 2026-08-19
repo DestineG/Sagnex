@@ -16,6 +16,7 @@ import cors from '@fastify/cors';
 import Fastify from 'fastify';
 import { ZodError, z } from 'zod';
 import type { DatabaseContext } from './database.js';
+import { AuthError, AuthService, readCookie, sessionCookie, clearSessionCookie, type AuthOptions } from './auth.js';
 import { SagnexStore, StoreError } from './store.js';
 import { WebDavError, WebDavService } from './webdav.js';
 
@@ -30,10 +31,11 @@ const webDavConfigSchema = z.object({
   remotePath: z.string().trim().min(1).max(320).default('Sagnex')
 });
 
-export function createApp(context: DatabaseContext, options: { fetcher?: typeof fetch; backupDirectory?: string } = {}) {
+export function createApp(context: DatabaseContext, options: { fetcher?: typeof fetch; backupDirectory?: string; auth?: AuthOptions } = {}) {
   const app = Fastify({ logger: false, bodyLimit: 25 * 1024 * 1024 });
   const store = new SagnexStore(context, { backupDirectory: options.backupDirectory });
   const webdav = new WebDavService(context, store, options.fetcher);
+  const auth = new AuthService(context, options.auth);
 
   app.register(cors, {
     origin: (origin, callback) => {
@@ -43,6 +45,7 @@ export function createApp(context: DatabaseContext, options: { fetcher?: typeof 
   });
 
   app.setErrorHandler((error, _request, reply) => {
+    if (error instanceof AuthError) return reply.status(error.statusCode).send({ message: error.message });
     if (error instanceof StoreError) {
       return reply.status(error.statusCode).send({ message: error.message, details: error.details });
     }
@@ -59,7 +62,42 @@ export function createApp(context: DatabaseContext, options: { fetcher?: typeof 
     return reply.status(500).send({ message: '服务器内部错误' });
   });
 
+  const isSecureRequest = (request: { headers: Record<string, string | string[] | undefined> }) => {
+    const forwarded = request.headers['x-forwarded-proto'];
+    return forwarded === 'https' || (Array.isArray(forwarded) ? forwarded[0] === 'https' : false);
+  };
+
+  app.addHook('preHandler', async (request, reply) => {
+    if (!auth.enabled || request.url === '/api/health' || request.url.startsWith('/api/auth/')) return;
+    const session = auth.getSession(readCookie(request.headers.cookie, 'sagnex_session'));
+    if (!session) return reply.status(401).send({ message: '请先登录', authRequired: true });
+    reply.header('Set-Cookie', sessionCookie(session.id, isSecureRequest(request), Math.max(0, Math.floor((Date.parse(session.expiresAt) - Date.now()) / 1000))));
+  });
+
   app.get('/api/health', async () => ({ name: 'sagnex', ok: true }));
+
+  app.get('/api/auth/status', async (request, reply) => {
+    if (!auth.enabled) return { authRequired: false, authenticated: true, email: null, expiresAt: null };
+    const session = auth.getSession(readCookie(request.headers.cookie, 'sagnex_session'));
+    if (!session) return { authRequired: true, authenticated: false, email: null, expiresAt: null };
+    reply.header('Set-Cookie', sessionCookie(session.id, isSecureRequest(request), Math.max(0, Math.floor((Date.parse(session.expiresAt) - Date.now()) / 1000))));
+    return { authRequired: true, authenticated: true, email: session.email, expiresAt: session.expiresAt };
+  });
+  app.post('/api/auth/request-code', async (request) => {
+    const input = z.object({ email: z.string().trim().email() }).parse(request.body);
+    return { ok: true, ...(await auth.requestCode(input.email, request.ip)) };
+  });
+  app.post('/api/auth/verify', async (request, reply) => {
+    const input = z.object({ email: z.string().trim().email(), code: z.string().regex(/^\d{6}$/) }).parse(request.body);
+    const session = auth.verifyCode(input.email, input.code);
+    reply.header('Set-Cookie', sessionCookie(session.id, isSecureRequest(request), Math.floor((Date.parse(session.expiresAt) - Date.now()) / 1000)));
+    return { authRequired: true, authenticated: true, email: session.email, expiresAt: session.expiresAt };
+  });
+  app.post('/api/auth/logout', async (request, reply) => {
+    auth.logout(readCookie(request.headers.cookie, 'sagnex_session'));
+    reply.header('Set-Cookie', clearSessionCookie(isSecureRequest(request)));
+    return { ok: true };
+  });
 
   app.get('/api/events', async (request) => {
     const query = z.object({

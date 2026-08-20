@@ -1,6 +1,11 @@
 # The public host can be a domain name or an IPv4 address. Caddy first asks an
 # ACME issuer for a publicly trusted certificate, then falls back to its local
 # CA when public issuance is unavailable.
+{
+	# TLS clients commonly omit SNI when connecting to a literal IP address.
+	default_sni {$SAGNEX_PUBLIC_HOST}
+}
+
 {$SAGNEX_PUBLIC_HOST} {
 	tls {
 		issuer acme

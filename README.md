@@ -41,7 +41,7 @@ SAGNEX_PUBLIC_HOST=203.0.113.20
 ```text
 config   从模板创建本机配置；已存在时询问是否覆盖
 start    构建镜像并启动 api、web、caddy
-update   拉取基础镜像、重新构建并启动
+update   使用本地基础镜像重新构建并启动
 stop     停止容器，保留数据、备份和证书
 ```
 

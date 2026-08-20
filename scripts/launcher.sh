@@ -106,8 +106,7 @@ run_action() {
       printf 'Public: https://%s\n' "$SAGNEX_PUBLIC_HOST"
       ;;
     update)
-      compose_command pull caddy
-      compose_command build --pull
+      compose_command build
       compose_command up -d --remove-orphans --wait
       printf 'Sagnex was updated. Public: https://%s\n' "$SAGNEX_PUBLIC_HOST"
       ;;

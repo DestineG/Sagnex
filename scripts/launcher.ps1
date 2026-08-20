@@ -85,8 +85,7 @@ function Invoke-Action([string]$action) {
       Write-Host "Public: https://$env:SAGNEX_PUBLIC_HOST"
     }
     'update' {
-      Invoke-Compose @('pull', 'caddy')
-      Invoke-Compose @('build', '--pull')
+      Invoke-Compose @('build')
       Invoke-Compose @('up', '-d', '--remove-orphans', '--wait')
       Write-Host "Sagnex was updated. Public: https://$env:SAGNEX_PUBLIC_HOST"
     }

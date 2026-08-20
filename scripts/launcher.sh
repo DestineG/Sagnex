@@ -89,6 +89,10 @@ compose_command() {
   docker compose --project-directory "$root_dir" --env-file "$environment_file" -f "$root_dir/docker/compose.yaml" "$@"
 }
 
+reload_caddy() {
+  compose_command exec -T caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
+}
+
 run_action() {
   local action="$1"
   command -v docker >/dev/null 2>&1 || { echo 'Docker was not found. Install Docker Engine and the Compose plugin.' >&2; exit 1; }
@@ -102,12 +106,14 @@ run_action() {
   case "$action" in
     start)
       compose_command up -d --build --remove-orphans --wait
+      reload_caddy
       printf 'LAN: http://%s\n' "$(compose_command port caddy 80)"
       printf 'Public: https://%s\n' "$SAGNEX_PUBLIC_HOST"
       ;;
     update)
       compose_command build
       compose_command up -d --remove-orphans --wait
+      reload_caddy
       printf 'Sagnex was updated. Public: https://%s\n' "$SAGNEX_PUBLIC_HOST"
       ;;
     stop)

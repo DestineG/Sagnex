@@ -47,6 +47,8 @@ stop     停止容器，保留数据、备份和证书
 
 如果直接执行 `start` 或 `update` 时配置不存在，脚本会询问是否从模板创建。数据库、备份和 Caddy 证书默认保存在项目的 `data` 目录；机器专用配置 `config/sagnex.env` 不进入 Git。
 
+`start` 和 `update` 会在容器健康后显式重新加载 Caddy 配置，因此仅修改 `docker/Caddyfile` 也会立即生效。
+
 ## 公网访问与 FRP
 
 Docker Compose 固定运行三个服务：

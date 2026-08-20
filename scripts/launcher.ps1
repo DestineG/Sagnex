@@ -71,6 +71,10 @@ function Invoke-Compose([string[]]$arguments) {
   if ($LASTEXITCODE -ne 0) { throw "docker compose $($arguments -join ' ') failed." }
 }
 
+function Update-CaddyConfiguration {
+  Invoke-Compose @('exec', '-T', 'caddy', 'caddy', 'reload', '--config', '/etc/caddy/Caddyfile', '--adapter', 'caddyfile')
+}
+
 function Invoke-Action([string]$action) {
   if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { throw 'Docker was not found. Install Docker Desktop and ensure docker is on PATH.' }
   if ($action -in @('start', 'update')) {
@@ -80,6 +84,7 @@ function Invoke-Action([string]$action) {
   switch ($action) {
     'start' {
       Invoke-Compose @('up', '-d', '--build', '--remove-orphans', '--wait')
+      Update-CaddyConfiguration
       $binding = (& docker compose --project-directory $rootDirectory --env-file $configPath -f $composeFile port caddy 80)
       Write-Host "LAN: http://$binding"
       Write-Host "Public: https://$env:SAGNEX_PUBLIC_HOST"
@@ -87,6 +92,7 @@ function Invoke-Action([string]$action) {
     'update' {
       Invoke-Compose @('build')
       Invoke-Compose @('up', '-d', '--remove-orphans', '--wait')
+      Update-CaddyConfiguration
       Write-Host "Sagnex was updated. Public: https://$env:SAGNEX_PUBLIC_HOST"
     }
     'stop' { Invoke-Compose @('down', '--remove-orphans'); Write-Host 'Sagnex stopped. Data and certificates were preserved.' }

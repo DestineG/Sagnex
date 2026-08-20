@@ -1,0 +1,29 @@
+# The public host can be a domain name or an IPv4 address. Caddy first asks an
+# ACME issuer for a publicly trusted certificate, then falls back to its local
+# CA when public issuance is unavailable.
+{$SAGNEX_PUBLIC_HOST} {
+	tls {
+		issuer acme
+		issuer internal
+	}
+
+	@api path /api/*
+	reverse_proxy @api api:4784 {
+		header_up Origin ""
+	}
+	reverse_proxy web:80
+}
+
+http://{$SAGNEX_PUBLIC_HOST} {
+	redir https://{$SAGNEX_PUBLIC_HOST}{uri} permanent
+}
+
+# Direct HTTP access for trusted LAN clients. Restrict port 80 to the LAN with
+# the host firewall; public requests for SAGNEX_PUBLIC_HOST are redirected above.
+:80 {
+	@api path /api/*
+	reverse_proxy @api api:4784 {
+		header_up Origin ""
+	}
+	reverse_proxy web:80
+}

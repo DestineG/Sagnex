@@ -5,21 +5,11 @@ root_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 config_dir="$root_dir/config"
 config_path="$config_dir/sagnex.env"
 config_example_path="$config_dir/sagnex.env.example"
-caddyfile_path="$config_dir/Caddyfile"
-caddyfile_example_path="$config_dir/Caddyfile.example"
 
 copy_default_config() {
   mkdir -p "$config_dir"
   cp "$config_example_path" "$config_path"
-  cp "$caddyfile_example_path" "$caddyfile_path"
   printf 'Created configuration: %s\n' "$config_path"
-}
-
-ensure_caddyfile() {
-  if [[ ! -f "$caddyfile_path" ]]; then
-    cp "$caddyfile_example_path" "$caddyfile_path"
-    printf 'Created Caddy configuration: %s\n' "$caddyfile_path"
-  fi
 }
 
 config_action() {
@@ -27,36 +17,70 @@ config_action() {
     copy_default_config
     return
   fi
-  ensure_caddyfile
   if [[ ! -t 0 ]]; then
     printf 'Configuration already exists and was not replaced: %s\n' "$config_path"
     return
   fi
   local answer
   read -r -p 'Configuration already exists. Replace it with the template? Existing settings will be lost. [y/N] ' answer
-  if [[ "$answer" =~ ^[Yy]$ ]]; then
-    copy_default_config
-  else
-    printf 'Configuration was not changed: %s\n' "$config_path"
-  fi
+  if [[ "$answer" =~ ^[Yy]$ ]]; then copy_default_config; else printf 'Configuration was not changed: %s\n' "$config_path"; fi
 }
 
 confirm_config_for_start() {
-  if [[ -f "$config_path" ]]; then
-    ensure_caddyfile
-    return 0
-  fi
+  [[ -f "$config_path" ]] && return 0
   if [[ ! -t 0 ]]; then
     echo 'Configuration is missing. Run ./sagnex.sh config before starting.' >&2
     return 1
   fi
   local answer
   read -r -p 'No local configuration was found. Create it from the template and continue? [y/N] ' answer
-  if [[ ! "$answer" =~ ^[Yy]$ ]]; then
-    echo 'Startup cancelled.'
+  if [[ ! "$answer" =~ ^[Yy]$ ]]; then echo 'Startup cancelled.'; return 1; fi
+  copy_default_config
+}
+
+read_config_value() {
+  local key="$1"
+  local line value
+  line="$(sed -n -E "s/^[[:space:]]*${key}[[:space:]]*=(.*)$/\1/p" "$config_path" | tail -n 1)"
+  value="${line#"${line%%[![:space:]]*}"}"
+  value="${value%"${value##*[![:space:]]}"}"
+  if [[ ${#value} -ge 2 ]]; then
+    if [[ "${value:0:1}" == '"' && "${value: -1}" == '"' ]] || [[ "${value:0:1}" == "'" && "${value: -1}" == "'" ]]; then
+      value="${value:1:${#value}-2}"
+    fi
+  fi
+  printf '%s' "$value"
+}
+
+validate_public_host() {
+  local host="$1"
+  if [[ -z "$host" || "$host" == 'sagnex.example.com' ]]; then
+    echo 'Set SAGNEX_PUBLIC_HOST to a public domain or IP address in config/sagnex.env.' >&2
     return 1
   fi
-  copy_default_config
+  if [[ "$host" == *://* || "$host" == */* || "$host" == *:* || "$host" =~ [[:space:]] ]]; then
+    echo 'SAGNEX_PUBLIC_HOST must contain only a domain name or IPv4 address, without scheme, port, path, or whitespace.' >&2
+    return 1
+  fi
+}
+
+prepare_directories() {
+  local data_dir backup_dir caddy_data_dir caddy_config_dir docker_user
+  data_dir="$(read_config_value SAGNEX_DATA_DIR)"; data_dir="${data_dir:-./data}"
+  backup_dir="$(read_config_value SAGNEX_BACKUP_DIR)"; backup_dir="${backup_dir:-./data/backups}"
+  caddy_data_dir="$(read_config_value SAGNEX_CADDY_DATA_DIR)"; caddy_data_dir="${caddy_data_dir:-./data/caddy}"
+  caddy_config_dir="$(read_config_value SAGNEX_CADDY_CONFIG_DIR)"; caddy_config_dir="${caddy_config_dir:-./data/caddy-config}"
+  docker_user="$(read_config_value SAGNEX_DOCKER_USER)"
+  [[ "$data_dir" = /* ]] || data_dir="$root_dir/$data_dir"
+  [[ "$backup_dir" = /* ]] || backup_dir="$root_dir/$backup_dir"
+  [[ "$caddy_data_dir" = /* ]] || caddy_data_dir="$root_dir/$caddy_data_dir"
+  [[ "$caddy_config_dir" = /* ]] || caddy_config_dir="$root_dir/$caddy_config_dir"
+  mkdir -p "$data_dir" "$backup_dir" "$caddy_data_dir" "$caddy_config_dir"
+  export SAGNEX_DATA_DIR="$data_dir"
+  export SAGNEX_BACKUP_DIR="$backup_dir"
+  export SAGNEX_CADDY_DATA_DIR="$caddy_data_dir"
+  export SAGNEX_CADDY_CONFIG_DIR="$caddy_config_dir"
+  export SAGNEX_DOCKER_USER="${docker_user:-$(id -u):$(id -g)}"
 }
 
 compose_command() {
@@ -65,63 +89,35 @@ compose_command() {
   docker compose --project-directory "$root_dir" --env-file "$environment_file" -f "$root_dir/docker/compose.yaml" "$@"
 }
 
-docker_action() {
+run_action() {
   local action="$1"
+  command -v docker >/dev/null 2>&1 || { echo 'Docker was not found. Install Docker Engine and the Compose plugin.' >&2; exit 1; }
   if [[ "$action" == 'start' || "$action" == 'update' ]]; then
     confirm_config_for_start || exit 1
-    set -a
-    # shellcheck disable=SC1090
-    source "$config_path"
-    set +a
-    local data_dir="${SAGNEX_DATA_DIR:-./data}"
-    local backup_dir="${SAGNEX_BACKUP_DIR:-./data/backups}"
-    [[ "$data_dir" = /* ]] || data_dir="$root_dir/$data_dir"
-    [[ "$backup_dir" = /* ]] || backup_dir="$root_dir/$backup_dir"
-    mkdir -p "$data_dir" "$backup_dir"
-    export SAGNEX_DATA_DIR="$data_dir"
-    export SAGNEX_BACKUP_DIR="$backup_dir"
-    export SAGNEX_DOCKER_USER="${SAGNEX_DOCKER_USER:-$(id -u):$(id -g)}"
+    SAGNEX_PUBLIC_HOST="$(read_config_value SAGNEX_PUBLIC_HOST)"
+    export SAGNEX_PUBLIC_HOST
+    validate_public_host "$SAGNEX_PUBLIC_HOST" || exit 1
+    prepare_directories
   fi
-  command -v docker >/dev/null 2>&1 || { echo 'Docker was not found. Install Docker Engine and the Compose plugin.' >&2; exit 1; }
-
   case "$action" in
     start)
       compose_command up -d --build --remove-orphans --wait
-      printf 'Sagnex is running at http://%s (LAN)\n' "$(compose_command port caddy 80)"
+      printf 'LAN: http://%s\n' "$(compose_command port caddy 80)"
+      printf 'Public: https://%s\n' "$SAGNEX_PUBLIC_HOST"
       ;;
     update)
+      compose_command pull caddy
       compose_command build --pull
       compose_command up -d --remove-orphans --wait
-      printf 'Sagnex was updated and is running at http://%s (LAN)\n' "$(compose_command port caddy 80)"
+      printf 'Sagnex was updated. Public: https://%s\n' "$SAGNEX_PUBLIC_HOST"
       ;;
     stop)
       compose_command down --remove-orphans
-      echo 'Sagnex stopped. Data was preserved.'
+      echo 'Sagnex stopped. Data and certificates were preserved.'
       ;;
-    *) echo 'Usage: ./sagnex.sh [docker] <start|update|stop>' >&2; exit 1 ;;
+    *) echo 'Usage: ./sagnex.sh <config|start|update|stop>' >&2; exit 1 ;;
   esac
 }
 
-native_action() {
-  local action="$1"
-  [[ "$action" =~ ^(start|update|stop)$ ]] || { echo 'Usage: ./sagnex.sh [docker] <start|update|stop>' >&2; exit 1; }
-  if [[ "$action" == 'start' || "$action" == 'update' ]]; then
-    confirm_config_for_start || exit 1
-  fi
-  command -v node >/dev/null 2>&1 || { echo 'Node.js was not found. Install Node.js 20 or newer.' >&2; exit 1; }
-  local major_version
-  major_version="$(node -p "process.versions.node.split('.')[0]")"
-  (( major_version >= 20 )) || { echo 'Sagnex requires Node.js 20 or newer.' >&2; exit 1; }
-  node "$root_dir/scripts/native-manager.mjs" "$action"
-}
-
-if [[ $# -eq 0 ]]; then
-  native_action start
-elif [[ "$1" == 'config' ]]; then
-  config_action
-elif [[ "$1" == 'docker' ]]; then
-  [[ $# -ge 2 ]] || { echo 'Usage: ./sagnex.sh docker <start|update|stop>' >&2; exit 1; }
-  docker_action "$2"
-else
-  native_action "$1"
-fi
+if [[ $# -ne 1 ]]; then echo 'Usage: ./sagnex.sh <config|start|update|stop>' >&2; exit 1; fi
+if [[ "$1" == 'config' ]]; then config_action; else run_action "$1"; fi

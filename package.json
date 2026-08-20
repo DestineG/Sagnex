@@ -10,7 +10,6 @@
   "scripts": {
     "dev": "pnpm --filter @sagnex/contracts build && concurrently -k -n api,web -c green,blue \"pnpm --filter @sagnex/api dev\" \"pnpm --filter @sagnex/web dev\"",
     "build": "pnpm -r --sort build",
-    "start": "node scripts/start.mjs",
     "typecheck": "pnpm --filter @sagnex/contracts build && pnpm -r --if-present typecheck",
     "lint": "eslint .",
     "test": "pnpm --filter @sagnex/contracts build && pnpm -r --if-present test",
@@ -24,7 +23,6 @@
     "eslint": "^9.39.1",
     "eslint-plugin-react-hooks": "^7.0.1",
     "globals": "^16.5.0",
-    "open": "^10.2.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.46.3"
   }

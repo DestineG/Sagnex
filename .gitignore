@@ -16,6 +16,5 @@ test-results/
 exports/
 backups/
 config/sagnex.env
-config/Caddyfile
 data/
 .sagnex/

@@ -1,5 +1,5 @@
 import type { Dependency, PreviewLatestComment, Task, TaskStatus } from '@sagnex/contracts';
-import { ChevronLeft, ChevronRight, MessageCircle, MessageCircleMore, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MessageCircle, MessageCircleMore, MessageCirclePlus, X } from 'lucide-react';
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { formatStatusDate, taskStatusText } from '../api';
@@ -330,6 +330,10 @@ export function ActiveFocusGraph({ tasks, dependencies, focusTaskId, latestComme
     }
     openCommentPopup(marker, taskId, true);
   };
+  const openCommentEditor = (taskId: string) => {
+    setCommentPopup(null);
+    (onAddComment ?? onTaskClick)?.(taskId);
+  };
   const markerStart = activeTasks.length <= 7 ? 0 : Math.min(Math.max(currentIndex - 2, 0), activeTasks.length - 5);
   const markerIndices = activeTasks.length <= 7
     ? activeTasks.map((_, index) => index)
@@ -356,8 +360,8 @@ export function ActiveFocusGraph({ tasks, dependencies, focusTaskId, latestComme
       onMouseLeave={() => { if (!commentPopup.pinned) schedulePopupClose(); }}
       onClick={(event) => event.stopPropagation()}
     >
-      <header><strong>最近评论</strong><button type="button" aria-label="关闭评论" onClick={() => setCommentPopup(null)}><X /></button></header>
-      {commentPopup.comments.length ? <div className="active-comment-list">{commentPopup.comments.map((comment) => <article key={comment.taskId + comment.createdAt}><time>{new Intl.DateTimeFormat('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(comment.createdAt))}</time><p>{comment.content}</p></article>)}</div> : <div className="active-comment-empty"><p>暂无评论</p><button type="button" onClick={() => { const taskId = commentPopup.taskId; setCommentPopup(null); (onAddComment ?? onTaskClick)?.(taskId); }}>进入详情添加评论</button></div>}
+      <header><strong>最近评论</strong><span className="active-comment-popup-actions"><button className="active-comment-add" type="button" aria-label="添加评论" data-tooltip="添加评论" onClick={() => openCommentEditor(commentPopup.taskId)}><MessageCirclePlus /></button><button type="button" aria-label="关闭评论" onClick={() => setCommentPopup(null)}><X /></button></span></header>
+      {commentPopup.comments.length ? <div className="active-comment-list">{commentPopup.comments.map((comment) => <article key={comment.taskId + comment.createdAt}><time>{new Intl.DateTimeFormat('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(comment.createdAt))}</time><p>{comment.content}</p></article>)}</div> : <div className="active-comment-empty"><p>暂无评论</p></div>}
     </aside>, document.body)}
     {showCarousel && <div className="active-focus-carousel" aria-label={`活跃任务 ${currentIndex + 1} / ${activeTasks.length}`} aria-busy={isTransitioning}>
       <button className="active-carousel-arrow previous" type="button" aria-label="上一个活跃任务" title="上一个活跃任务" disabled={isTransitioning} onClick={(event) => changeFocus(event, -1)}><ChevronLeft /></button>

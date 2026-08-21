@@ -71,16 +71,19 @@ describe('ActiveFocusGraph', () => {
     expect(marker.querySelector('.active-comment-dot')).not.toBeInTheDocument();
     await userEvent.hover(marker);
     expect(screen.getByRole('dialog', { name: '最近评论' })).toHaveTextContent('第二条评论 👍');
+    expect(screen.getByRole('button', { name: '添加评论' })).toBeInTheDocument();
     await userEvent.click(marker);
     expect(onTaskClick).not.toHaveBeenCalled();
     expect(screen.getByRole('dialog', { name: '最近评论' })).toHaveTextContent('第一条评论');
+    await userEvent.click(screen.getByRole('button', { name: '关闭评论' }));
   });
 
   it('offers a detail link when the focus task has no comments', async () => {
     const onTaskClick = vi.fn();
     const { container } = render(<ActiveFocusGraph tasks={[focus]} dependencies={[]} focusTaskId={focus.id} onTaskClick={onTaskClick} />);
     await userEvent.click(within(container).getByRole('button', { name: `查看${focus.title}的评论` }));
-    await userEvent.click(screen.getByRole('button', { name: '进入详情添加评论' }));
+    const dialog = screen.getByRole('dialog', { name: '最近评论' });
+    await userEvent.click(within(dialog).getByRole('button', { name: '添加评论' }));
     expect(onTaskClick).toHaveBeenCalledWith(focus.id);
   });
 

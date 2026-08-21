@@ -215,17 +215,20 @@ svg { width: 17px; height: 17px; flex: 0 0 auto; }
 .active-comment-popup.placement-sheet { box-shadow: 0 12px 32px rgb(28 47 36 / 16%), 0 2px 7px rgb(28 47 36 / 7%); }
 .active-comment-popup > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 6px 0 11px; border-bottom: 1px solid #e5ebe7; color: var(--muted-strong); font-size: 12px; }
 .active-comment-popup > header strong { font-weight: 650; }
+.active-comment-popup-actions { display: flex; align-items: center; gap: 1px; }
 .active-comment-popup > header button { display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 4px; color: #7a8780; background: transparent; cursor: pointer; }
 .active-comment-popup > header button svg { width: 14px; height: 14px; }
 .active-comment-popup > header button:hover, .active-comment-popup > header button:focus-visible { color: var(--text); background: var(--subtle); outline: none; }
+.active-comment-popup > header .active-comment-add { position: relative; color: var(--green-strong); }
+.active-comment-popup > header .active-comment-add:hover, .active-comment-popup > header .active-comment-add:focus-visible { color: #075c3d; background: var(--green-soft); }
+.active-comment-add[data-tooltip]::after { position: absolute; z-index: 2; top: calc(100% + 5px); right: 0; width: max-content; padding: 4px 6px; border-radius: 4px; color: #fff; background: #27322c; content: attr(data-tooltip); font-size: 11px; line-height: 1.2; opacity: 0; pointer-events: none; transform: translateY(-2px); transition: opacity 100ms ease 220ms, transform 100ms ease 220ms; }
+.active-comment-add[data-tooltip]:hover::after, .active-comment-add[data-tooltip]:focus-visible::after { opacity: 1; transform: translateY(0); }
 .active-comment-list { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 5px 10px 8px 11px; scrollbar-width: thin; scrollbar-color: #bdc9c1 transparent; }
 .active-comment-list article { padding: 7px 0 8px; border-bottom: 1px solid #e8edea; }
 .active-comment-list article:last-child { border-bottom: 0; }
 .active-comment-list time { display: block; color: var(--muted); font-size: 10px; }
 .active-comment-list p { margin-top: 3px; overflow-wrap: anywhere; color: #344139; white-space: pre-wrap; line-height: 1.45; }
-.active-comment-empty { display: grid; place-items: center; align-content: center; gap: 5px; padding: 12px; color: var(--muted); text-align: center; }
-.active-comment-empty button { padding: 2px 4px; border: 0; border-radius: 3px; color: var(--green-strong); background: transparent; cursor: pointer; font-size: 12px; }
-.active-comment-empty button:hover, .active-comment-empty button:focus-visible { color: #075c3d; background: var(--green-soft); outline: none; }
+.active-comment-empty { display: grid; place-items: center; align-content: center; padding: 12px; color: var(--muted); text-align: center; }
 .active-export.exporting .active-comment-marker, .active-export.exporting .active-comment-popup { display: none; }
 .graph-node-action { cursor: pointer; pointer-events: all; }
 .graph-node-action:hover > g > rect:first-child, .graph-node-action:focus-visible > g > rect:first-child { stroke: #137a55; stroke-width: 3; }

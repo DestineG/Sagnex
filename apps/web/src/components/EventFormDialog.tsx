@@ -1,6 +1,7 @@
 import type { CreateEventInput, Label } from '@sagnex/contracts';
 import { useState, type FormEvent } from 'react';
 import { Dialog } from './Dialog';
+import { EmojiTextInput } from './EmojiTextInput';
 import { LabelPicker } from './LabelPicker';
 
 interface EventFormDialogProps {
@@ -32,7 +33,7 @@ export function EventFormDialog({ labels, onClose, onCreate, onCreateLabel }: Ev
 
   return <Dialog title="新建事件" onClose={onClose} onSubmit={submit} submitLabel="创建并规划" busy={busy}>
     <label className="field"><span>标题</span><input autoFocus value={title} onChange={(event) => setTitle(event.target.value)} maxLength={160} placeholder="要完成什么？" /></label>
-    <label className="field"><span>简介</span><textarea value={description} onChange={(event) => setDescription(event.target.value)} maxLength={2000} rows={3} placeholder="补充必要背景" /></label>
+    <label className="field"><span>简介</span><EmojiTextInput value={description} onChange={setDescription} maxLength={2000} rows={3} placeholder="补充必要背景" /></label>
     <div className="field"><span>标签</span><LabelPicker labels={labels} selectedIds={labelIds} onChange={setLabelIds} onCreate={onCreateLabel} /></div>
     {error && <p className="error-banner">{error}</p>}
   </Dialog>;

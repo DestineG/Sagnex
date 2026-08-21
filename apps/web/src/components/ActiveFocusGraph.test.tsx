@@ -34,6 +34,34 @@ describe('ActiveFocusGraph', () => {
     expect(onTaskClick).toHaveBeenNthCalledWith(2, focus.id);
   });
 
+  it('shows the latest comments from the focus marker without opening the task', async () => {
+    const onTaskClick = vi.fn();
+    const { container } = render(<ActiveFocusGraph
+      tasks={[focus, predecessor, successor]}
+      dependencies={dependencies}
+      focusTaskId={focus.id}
+      latestComments={[
+        { taskId: focus.id, content: '第二条评论 👍', createdAt: '2026-01-02T00:00:00.000Z' },
+        { taskId: focus.id, content: '第一条评论', createdAt: '2026-01-01T00:00:00.000Z' }
+      ]}
+      onTaskClick={onTaskClick}
+    />);
+    const marker = within(container).getByRole('button', { name: `查看${focus.title}的最近评论` });
+    await userEvent.hover(marker);
+    expect(within(container).getByRole('dialog', { name: '最近评论' })).toHaveTextContent('第二条评论 👍');
+    await userEvent.click(marker);
+    expect(onTaskClick).not.toHaveBeenCalled();
+    expect(within(container).getByRole('dialog', { name: '最近评论' })).toHaveTextContent('第一条评论');
+  });
+
+  it('offers a detail link when the focus task has no comments', async () => {
+    const onTaskClick = vi.fn();
+    const { container } = render(<ActiveFocusGraph tasks={[focus]} dependencies={[]} focusTaskId={focus.id} onTaskClick={onTaskClick} />);
+    await userEvent.click(within(container).getByRole('button', { name: `查看${focus.title}的评论` }));
+    await userEvent.click(within(container).getByRole('button', { name: '进入详情添加评论' }));
+    expect(onTaskClick).toHaveBeenCalledWith(focus.id);
+  });
+
   it('cycles through running and paused tasks without opening the event', async () => {
     const onTaskClick = vi.fn();
     const cardClick = vi.fn();

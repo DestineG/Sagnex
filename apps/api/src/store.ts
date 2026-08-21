@@ -123,13 +123,20 @@ export class SagnexStore {
   }
 
   async listEvents(filters: EventFilters = {}): Promise<EventSummary[]> {
-    const [eventRows, taskRows, dependencyRows, labelRows, joinRows] = await Promise.all([
+    const [eventRows, taskRows, dependencyRows, labelRows, joinRows, commentRows] = await Promise.all([
       this.context.db.select().from(events).orderBy(desc(events.updatedAt)),
       this.context.db.select().from(tasks),
       this.context.db.select().from(dependencies),
       this.listLabels(),
-      this.context.db.select().from(eventLabels)
+      this.context.db.select().from(eventLabels),
+      this.context.db.select().from(taskComments).orderBy(desc(taskComments.createdAt))
     ]);
+    const latestCommentsByTask = new Map<string, { taskId: string; content: string; createdAt: string }[]>();
+    for (const comment of commentRows) {
+      const comments = latestCommentsByTask.get(comment.taskId) ?? [];
+      if (comments.length < 3) comments.push({ taskId: comment.taskId, content: comment.content, createdAt: comment.createdAt });
+      latestCommentsByTask.set(comment.taskId, comments);
+    }
     const search = filters.search?.trim().toLocaleLowerCase();
     const activeEventIds = filters.active
       ? new Set(taskRows.filter((task) => task.status === 'in_progress' || task.status === 'paused').map((task) => task.eventId))
@@ -154,7 +161,10 @@ export class SagnexStore {
         labels: eventLabelRows,
         previewFocusTaskId: previewFocus?.id ?? null,
         previewTasks: eventTasks.filter((task) => previewIds.has(task.id)),
-        previewDependencies: eventDependencies.filter((edge) => previewIds.has(edge.sourceTaskId) && previewIds.has(edge.targetTaskId))
+        previewDependencies: eventDependencies.filter((edge) => previewIds.has(edge.sourceTaskId) && previewIds.has(edge.targetTaskId)),
+        previewLatestComments: filters.preview === 'full' ? [] : eventTasks
+          .filter((task) => previewIds.has(task.id))
+          .flatMap((task) => latestCommentsByTask.get(task.id) ?? [])
       } satisfies EventSummary;
     });
     return result.filter((event) => {

@@ -107,7 +107,12 @@ export const eventSummarySchema = z.object({
   labels: z.array(labelSchema),
   previewFocusTaskId: z.string().uuid().nullable().default(null),
   previewTasks: z.array(taskSchema).default([]),
-  previewDependencies: z.array(dependencySchema).default([])
+  previewDependencies: z.array(dependencySchema).default([]),
+  previewLatestComments: z.array(z.object({
+    taskId: z.string().uuid(),
+    content: z.string().min(1).max(1000),
+    createdAt: z.string()
+  })).default([])
 });
 
 export const eventGraphSchema = eventSummarySchema.extend({
@@ -206,6 +211,7 @@ export type Task = z.infer<typeof taskSchema>;
 export type Dependency = z.infer<typeof dependencySchema>;
 export type StateChange = z.infer<typeof stateChangeSchema>;
 export type TaskComment = z.infer<typeof taskCommentSchema>;
+export type PreviewLatestComment = z.infer<typeof eventSummarySchema>['previewLatestComments'][number];
 export type EventSummary = z.infer<typeof eventSummarySchema>;
 export type EventGraph = z.infer<typeof eventGraphSchema>;
 export type BackupEnvelope = z.infer<typeof backupEnvelopeSchema>;

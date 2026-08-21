@@ -12,6 +12,7 @@ import { useLocation, useNavigate, useParams, useSearchParams } from 'react-rout
 import { ApiError, api, downloadBlob, downloadJson, eventStatusText, exportStamp, formatDate, formatStatusDate, taskStatusText } from '../api';
 import { CopyEventDialog } from '../components/CopyEventDialog';
 import { Dialog } from '../components/Dialog';
+import { EmojiTextInput } from '../components/EmojiTextInput';
 import { graphPngBlob } from '../components/GraphSvg';
 import { LabelPicker } from '../components/LabelPicker';
 import { createMiniMapBounds, expandMiniMapBounds, type WorldBounds } from '../components/canvasMiniMapGeometry';
@@ -279,17 +280,18 @@ function EventInspector({ graph, labels, onUpdate }: { graph: EventGraph; labels
   }, [description, graph.archivedAt, graph.description, graph.title, onUpdate, title]);
   const selectedLabels = graph.labels.map((label) => label.id);
   return <div className="inspector-content">
-    <section><p className="inspector-label">事件</p><label className="field compact"><span>标题</span><input value={title} onChange={(event) => setTitle(event.target.value)} disabled={Boolean(graph.archivedAt)} /></label><label className="field compact"><span>简介</span><textarea rows={4} value={description} onChange={(event) => setDescription(event.target.value)} disabled={Boolean(graph.archivedAt)} /></label></section>
+    <section><p className="inspector-label">事件</p><label className="field compact"><span>标题</span><input value={title} onChange={(event) => setTitle(event.target.value)} disabled={Boolean(graph.archivedAt)} /></label><label className="field compact"><span>简介</span><EmojiTextInput rows={4} value={description} onChange={setDescription} maxLength={2000} disabled={Boolean(graph.archivedAt)} /></label></section>
     <section><p className="inspector-label">标签</p><LabelPicker labels={labels} selectedIds={selectedLabels} onChange={(labelIds) => onUpdate({ labelIds })} disabled={Boolean(graph.archivedAt)} /></section>
     <section><p className="inspector-label">进度</p><strong>{graph.completedTasks} / {graph.totalTasks}</strong><span className="progress wide"><i style={{ width: `${graph.totalTasks ? (graph.completedTasks / graph.totalTasks) * 100 : 0}%` }} /></span></section>
   </div>;
 }
 
-function TaskInspector({ graph, task, history, comments, onUpdate, onTransition, onCreateComment, onDeleteComment, onSelectTask, onDelete, transitionPending, commentPending, deletePending }: {
+function TaskInspector({ graph, task, history, comments, autoFocusComment, onUpdate, onTransition, onCreateComment, onDeleteComment, onSelectTask, onDelete, transitionPending, commentPending, deletePending }: {
   graph: EventGraph;
   task: Task;
   history: StateChange[];
   comments: TaskComment[];
+  autoFocusComment?: boolean;
   onUpdate: (value: { title?: string; description?: string }) => void;
   onTransition: (status: TaskStatus, comment: string, onSuccess: () => void) => void;
   onCreateComment: (content: string, onSuccess: () => void) => void;
@@ -313,14 +315,14 @@ function TaskInspector({ graph, task, history, comments, onUpdate, onTransition,
   const transitionTo = (status: TaskStatus) => onTransition(status, statusComment, () => setStatusComment(''));
   return <div className="inspector-content">
     <section><p className="inspector-label">任务信息</p><label className="field compact"><span>标题</span><input value={title} onChange={(event) => setTitle(event.target.value)} disabled={Boolean(graph.archivedAt)} /></label><label className="field compact"><span>简介</span><textarea rows={4} value={description} onChange={(event) => setDescription(event.target.value)} disabled={Boolean(graph.archivedAt)} /></label><div className="field compact"><span>前置任务</span>{incoming.length ? <div className="dependency-list">{incoming.map((item) => <button type="button" key={item.id} onClick={() => onSelectTask(item.id)}>{item.title}<i>{taskStatusText[item.status]}</i></button>)}</div> : <p className="muted">无</p>}</div></section>
-    <section><p className="inspector-label">状态</p><strong>{taskStatusText[task.status]}</strong>{!graph.archivedAt && <><label className="field compact status-comment"><span>本次状态备注（可选）</span><textarea rows={2} maxLength={500} value={statusComment} onChange={(event) => setStatusComment(event.target.value)} /></label><div className="task-actions">
+    <section><p className="inspector-label">状态</p><strong>{taskStatusText[task.status]}</strong>{!graph.archivedAt && <><label className="field compact status-comment"><span>本次状态备注（可选）</span><EmojiTextInput rows={2} value={statusComment} onChange={setStatusComment} maxLength={500} /></label><div className="task-actions">
       {task.status === 'not_started' && <button className="button primary" disabled={transitionPending} onClick={() => transitionTo('in_progress')}><Play />开始</button>}
       {task.status === 'in_progress' && <><button className="button" disabled={transitionPending} onClick={() => transitionTo('paused')}><Pause />暂停</button><button className="button primary" disabled={transitionPending} onClick={() => transitionTo('completed')}><Check />完成</button></>}
       {task.status === 'paused' && <><button className="button" disabled={transitionPending} onClick={() => transitionTo('in_progress')}><Play />继续</button><button className="button primary" disabled={transitionPending} onClick={() => transitionTo('completed')}><Check />完成</button></>}
       {task.status === 'completed' && <button className="button" disabled={transitionPending} onClick={() => transitionTo('in_progress')}><Play />重新打开</button>}
     </div></>}
     </section>
-    <section><p className="inspector-label">任务评论</p>{!graph.archivedAt && <form className="comment-compose" onSubmit={(event) => { event.preventDefault(); if (comment.trim()) onCreateComment(comment.trim(), () => setComment('')); }}><textarea aria-label="任务评论" rows={2} maxLength={1000} value={comment} onChange={(event) => setComment(event.target.value)} placeholder="记录补充信息" /><button className="icon-button primary-icon" type="submit" disabled={!comment.trim() || commentPending} aria-label="提交评论" data-tooltip="提交评论"><Send /></button></form>}{comments.length ? <div className="comment-list">{comments.map((item) => <article key={item.id}><p>{item.content}</p><footer><time>{formatDate(item.createdAt)}</time>{!graph.archivedAt && <button className="icon-button danger" type="button" aria-label="删除评论" data-tooltip="删除评论" onClick={() => onDeleteComment(item.id)}><Trash2 /></button>}</footer></article>)}</div> : <p className="muted">暂无评论</p>}</section>
+    <section><p className="inspector-label">任务评论</p>{!graph.archivedAt && <form className="comment-compose" onSubmit={(event) => { event.preventDefault(); if (comment.trim()) onCreateComment(comment.trim(), () => setComment('')); }}><EmojiTextInput aria-label="任务评论" rows={2} maxLength={1000} value={comment} onChange={setComment} placeholder="记录补充信息" autoFocus={autoFocusComment} trailing={<button className="icon-button primary-icon" type="submit" disabled={!comment.trim() || commentPending} aria-label="提交评论" data-tooltip="提交评论"><Send /></button>} /></form>}{comments.length ? <div className="comment-list">{comments.map((item) => <article key={item.id}><p>{item.content}</p><footer><time>{formatDate(item.createdAt)}</time>{!graph.archivedAt && <button className="icon-button danger" type="button" aria-label="删除评论" data-tooltip="删除评论" onClick={() => onDeleteComment(item.id)}><Trash2 /></button>}</footer></article>)}</div> : <p className="muted">暂无评论</p>}</section>
     <section><p className="inspector-label">状态历史</p>{history.length ? <div className="history-list">{history.map((change) => <div key={change.id}><i /><span>{taskStatusText[change.fromStatus]} → {taskStatusText[change.toStatus]}{change.comment && <em>{change.comment}</em>}<time>{formatDate(change.changedAt)}</time></span></div>)}</div> : <p className="muted">尚无状态变化</p>}</section>
     {!graph.archivedAt && <section><button className="button danger-text" disabled={deletePending} onClick={onDelete}><Trash2 />{deletePending ? '删除中' : '删除任务'}</button></section>}
   </div>;
@@ -330,6 +332,7 @@ function Editor({ graph, labels, onExportJson, onArchive, onRestoreEvent, onCopy
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedTaskId = searchParams.get('task');
+  const autoFocusComment = searchParams.get('comment') === '1';
   const [exportOpen, setExportOpen] = useState(false);
   const [eventActionsOpen, setEventActionsOpen] = useState(false);
   const [copyOpen, setCopyOpen] = useState(false);
@@ -596,7 +599,7 @@ function Editor({ graph, labels, onExportJson, onArchive, onRestoreEvent, onCopy
       </div>
     </div>
     <aside className="inspector">
-      {selectedTask ? <TaskInspector key={selectedTask.id} graph={graph} task={selectedTask} history={history} comments={comments} onUpdate={(value) => updateTask.mutate({ id: selectedTask.id, value })} onTransition={(status, comment, afterSuccess) => transition.mutate({ id: selectedTask.id, status, comment, afterSuccess })} onCreateComment={(content, afterSuccess) => createComment.mutate({ taskId: selectedTask.id, content, afterSuccess })} onDeleteComment={(id) => { if (window.confirm('删除这条任务评论？')) removeComment.mutate(id); }} onSelectTask={(id) => setSearchParams({ task: id })} transitionPending={transition.isPending} commentPending={createComment.isPending} deletePending={removeTask.isPending} onDelete={() => requestTaskDeletion(selectedTask.id)} /> : <EventInspector key={graph.id} graph={graph} labels={labels} onUpdate={(value) => updateEvent.mutate(value)} />}
+      {selectedTask ? <TaskInspector key={selectedTask.id} graph={graph} task={selectedTask} history={history} comments={comments} autoFocusComment={autoFocusComment} onUpdate={(value) => updateTask.mutate({ id: selectedTask.id, value })} onTransition={(status, comment, afterSuccess) => transition.mutate({ id: selectedTask.id, status, comment, afterSuccess })} onCreateComment={(content, afterSuccess) => createComment.mutate({ taskId: selectedTask.id, content, afterSuccess })} onDeleteComment={(id) => { if (window.confirm('删除这条任务评论？')) removeComment.mutate(id); }} onSelectTask={(id) => setSearchParams({ task: id })} transitionPending={transition.isPending} commentPending={createComment.isPending} deletePending={removeTask.isPending} onDelete={() => requestTaskDeletion(selectedTask.id)} /> : <EventInspector key={graph.id} graph={graph} labels={labels} onUpdate={(value) => updateEvent.mutate(value)} />}
     </aside>
     {taskDialog && <TaskDialog successor={Boolean(taskDialog.sourceTaskId)} onClose={() => setTaskDialog(null)} onCreate={(value) => createTask.mutateAsync({ value, sourceTaskId: taskDialog.sourceTaskId }).then(() => undefined)} />}
     {copyOpen && <CopyEventDialog sourceTitle={graph.title} onClose={() => setCopyOpen(false)} onCopy={onCopy} />}

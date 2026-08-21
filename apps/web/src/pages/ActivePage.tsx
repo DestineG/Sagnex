@@ -81,7 +81,7 @@ export function ActivePage() {
                 <span className="progress"><i style={{ width: `${event.totalTasks ? (event.completedTasks / event.totalTasks) * 100 : 0}%` }} /></span>
               </div>
             </div>
-            <ActiveFocusGraph tasks={event.previewTasks} dependencies={event.previewDependencies} focusTaskId={event.previewFocusTaskId} onCanvasClick={() => navigate(`/events/${event.id}`, { state: { returnTo: '/' } })} onTaskClick={(taskId) => navigate(`/events/${event.id}?task=${taskId}`, { state: { returnTo: '/' } })} />
+            <ActiveFocusGraph tasks={event.previewTasks} dependencies={event.previewDependencies} focusTaskId={event.previewFocusTaskId} latestComments={event.previewLatestComments} onCanvasClick={() => navigate(`/events/${event.id}`, { state: { returnTo: '/' } })} onTaskClick={(taskId) => navigate(`/events/${event.id}?task=${taskId}`, { state: { returnTo: '/' } })} onAddComment={(taskId) => navigate(`/events/${event.id}?task=${taskId}&comment=1`, { state: { returnTo: '/' } })} />
             <footer className="event-card-foot"><span>最近更新</span><time>{formatDate(event.updatedAt)}</time></footer>
           </article>)}
         </div>

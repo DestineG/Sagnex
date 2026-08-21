@@ -203,13 +203,14 @@ svg { width: 17px; height: 17px; flex: 0 0 auto; }
 .active-focus-node:hover > rect:first-of-type, .active-focus-node:focus-visible > rect:first-of-type { stroke: #137a55; stroke-width: 3; }
 .active-compact-node:hover rect, .active-compact-node:focus-visible rect { filter: brightness(.92); stroke-width: 2; }
 .active-focus-node:focus-visible, .active-compact-node:focus-visible { outline: none; }
-.active-comment-marker { position: relative; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 5px; color: #87938c; background: transparent; opacity: .62; cursor: pointer; transition: color 120ms ease, opacity 120ms ease, background 120ms ease; }
+.active-comment-object { overflow: visible; }
+.active-comment-marker { position: relative; display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 5px; color: #87938c; background: transparent; opacity: .62; cursor: pointer; transition: color 120ms ease, opacity 120ms ease; }
+.active-comment-marker::before { position: absolute; inset: -2px; content: ""; }
 .active-comment-marker svg { width: 16px; height: 16px; }
-.active-comment-marker:hover, .active-comment-marker:focus-visible { color: #59675f; background: rgb(255 255 255 / 48%); opacity: 1; outline: none; }
+.active-comment-marker:hover, .active-comment-marker:focus-visible { color: #59675f; background: transparent; opacity: 1; outline: none; }
 .active-comment-marker:focus-visible { box-shadow: 0 0 0 2px rgb(19 122 85 / 22%); }
 .active-comment-marker.has-comments { color: var(--green-strong); opacity: 1; }
-.active-comment-marker.has-comments:hover, .active-comment-marker.has-comments:focus-visible { color: #075c3d; background: rgb(255 255 255 / 42%); }
-.active-comment-dot { position: absolute; top: 4px; right: 3px; width: 5px; height: 5px; border: 1px solid #f4faf6; border-radius: 50%; background: #e06f2d; box-shadow: 0 0 0 1px rgb(181 80 25 / 12%); }
+.active-comment-marker.has-comments:hover, .active-comment-marker.has-comments:focus-visible { color: #075c3d; background: transparent; }
 .active-comment-popup { position: fixed; z-index: 120; display: grid; grid-template-rows: 32px minmax(0, 1fr); height: 176px; overflow: hidden; border: 1px solid #ced8d2; border-radius: 7px; background: rgb(255 255 255 / 97%); box-shadow: 0 9px 24px rgb(28 47 36 / 12%), 0 2px 6px rgb(28 47 36 / 6%); pointer-events: auto; }
 .active-comment-popup.placement-sheet { box-shadow: 0 12px 32px rgb(28 47 36 / 16%), 0 2px 7px rgb(28 47 36 / 7%); }
 .active-comment-popup > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 6px 0 11px; border-bottom: 1px solid #e5ebe7; color: var(--muted-strong); font-size: 12px; }

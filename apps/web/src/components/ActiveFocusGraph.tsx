@@ -1,5 +1,5 @@
 import type { Dependency, PreviewLatestComment, Task, TaskStatus } from '@sagnex/contracts';
-import { ChevronLeft, ChevronRight, MessageCircle, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MessageCircle, MessageCircleMore, X } from 'lucide-react';
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { formatStatusDate, taskStatusText } from '../api';
@@ -12,7 +12,7 @@ const FOCUS_WIDTH = 156;
 const FOCUS_HEIGHT = 78;
 const FOCUS_X = (VIEW_WIDTH - FOCUS_WIDTH) / 2;
 const FOCUS_Y = (VIEW_HEIGHT - FOCUS_HEIGHT) / 2;
-const FOCUS_TEXT_WIDTH = FOCUS_WIDTH - 56;
+const FOCUS_TEXT_WIDTH = FOCUS_WIDTH - 52;
 const SIDE_MARGIN = 44;
 const SIDE_TOP = 18;
 const SIDE_BOTTOM = 38;
@@ -203,7 +203,7 @@ function ActiveGraphLayer({ className, focus, tasks, dependencies, markerId, lat
       <rect x={FOCUS_X} y={FOCUS_Y} width="5" height={FOCUS_HEIGHT} rx="2.5" fill={palette.accent} />
       <text x={FOCUS_X + 16} y={FOCUS_Y + 22} fill="#1f2923" fontFamily="Segoe UI, Microsoft YaHei, sans-serif" fontSize="14" fontWeight="600">{truncateSvgText(focus.title, FOCUS_TEXT_WIDTH, 14)}</text>
       {focus.description && <text x={FOCUS_X + 16} y={FOCUS_Y + 41} fill="#69756e" fontFamily="Segoe UI, Microsoft YaHei, sans-serif" fontSize="10.5">{truncateSvgText(focus.description, FOCUS_TEXT_WIDTH, 10.5)}</text>}
-      <foreignObject x={FOCUS_X + FOCUS_WIDTH - 36} y={FOCUS_Y + 7} width="28" height="28">
+      <foreignObject className="active-comment-object" x={FOCUS_X + FOCUS_WIDTH - 28} y={FOCUS_Y + 3} width="24" height="24">
         <button
           className={latestComments.length ? 'active-comment-marker has-comments' : 'active-comment-marker'}
           type="button"
@@ -213,7 +213,7 @@ function ActiveGraphLayer({ className, focus, tasks, dependencies, markerId, lat
           onFocus={(event) => onCommentMarkerEnter?.(event.currentTarget, focus.id)}
           onBlur={onCommentMarkerLeave}
           onClick={(event) => { event.preventDefault(); event.stopPropagation(); onCommentMarkerClick?.(event.currentTarget, focus.id); }}
-        ><MessageCircle aria-hidden="true" />{latestComments.length > 0 && <span className="active-comment-dot" aria-hidden="true" />}</button>
+        >{latestComments.length > 0 ? <MessageCircleMore aria-hidden="true" /> : <MessageCircle aria-hidden="true" />}</button>
       </foreignObject>
       <FocusStatusGlyph status={focus.status} x={FOCUS_X + 16} y={FOCUS_Y + FOCUS_HEIGHT - 15} />
       <text x={FOCUS_X + 31} y={FOCUS_Y + FOCUS_HEIGHT - 11} fill={palette.text} fontFamily="Segoe UI, Microsoft YaHei, sans-serif" fontSize="11">{taskStatusText[focus.status]}</text>

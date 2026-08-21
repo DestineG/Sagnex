@@ -61,8 +61,14 @@ describe('ActiveFocusGraph', () => {
       onTaskClick={onTaskClick}
     />);
     const marker = within(container).getByRole('button', { name: `查看${focus.title}的最近评论` });
+    const markerObject = marker.parentElement;
     expect(marker).not.toHaveAttribute('title');
-    expect(marker.querySelector('.active-comment-dot')).toBeInTheDocument();
+    expect(markerObject).toHaveAttribute('x', '260');
+    expect(markerObject).toHaveAttribute('y', '83');
+    expect(markerObject).toHaveAttribute('width', '24');
+    expect(markerObject).toHaveAttribute('height', '24');
+    expect(marker.querySelector('.lucide-message-circle-more')).toBeInTheDocument();
+    expect(marker.querySelector('.active-comment-dot')).not.toBeInTheDocument();
     await userEvent.hover(marker);
     expect(screen.getByRole('dialog', { name: '最近评论' })).toHaveTextContent('第二条评论 👍');
     await userEvent.click(marker);

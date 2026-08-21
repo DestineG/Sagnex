@@ -61,14 +61,13 @@ describe('ActiveFocusGraph', () => {
       onTaskClick={onTaskClick}
     />);
     const marker = within(container).getByRole('button', { name: `查看${focus.title}的最近评论` });
-    const markerObject = marker.parentElement;
     expect(marker).not.toHaveAttribute('title');
-    expect(markerObject).toHaveAttribute('x', '260');
-    expect(markerObject).toHaveAttribute('y', '83');
-    expect(markerObject).toHaveAttribute('width', '24');
-    expect(markerObject).toHaveAttribute('height', '24');
-    expect(marker.querySelector('.lucide-message-circle-more')).toBeInTheDocument();
+    expect(marker).toHaveAttribute('transform', 'translate(260 83)');
+    expect(marker.querySelector('.active-comment-hit')).toHaveAttribute('width', '28');
+    expect(marker.querySelector('.active-comment-hit')).toHaveAttribute('height', '28');
+    expect(marker.querySelector('.active-comment-icon-dots')).toBeInTheDocument();
     expect(marker.querySelector('.active-comment-dot')).not.toBeInTheDocument();
+    expect(container.querySelector('foreignObject')).not.toBeInTheDocument();
     await userEvent.hover(marker);
     expect(screen.getByRole('dialog', { name: '最近评论' })).toHaveTextContent('第二条评论 👍');
     expect(screen.getByRole('button', { name: '添加评论' })).toBeInTheDocument();

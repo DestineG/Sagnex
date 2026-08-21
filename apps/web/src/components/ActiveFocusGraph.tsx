@@ -1,5 +1,5 @@
 import type { Dependency, PreviewLatestComment, Task, TaskStatus } from '@sagnex/contracts';
-import { ChevronLeft, ChevronRight, MessageCircle, MessageCircleMore, MessageCirclePlus, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MessageCirclePlus, X } from 'lucide-react';
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { formatStatusDate, taskStatusText } from '../api';
@@ -130,9 +130,9 @@ interface ActiveGraphLayerProps {
   markerId: string;
   latestComments: PreviewLatestComment[];
   onTaskClick?: (taskId: string) => void;
-  onCommentMarkerEnter?: (marker: HTMLButtonElement, taskId: string) => void;
+  onCommentMarkerEnter?: (marker: SVGGElement, taskId: string) => void;
   onCommentMarkerLeave?: () => void;
-  onCommentMarkerClick?: (marker: HTMLButtonElement, taskId: string) => void;
+  onCommentMarkerClick?: (marker: SVGGElement, taskId: string) => void;
   onAnimationEnd?: () => void;
 }
 
@@ -203,18 +203,35 @@ function ActiveGraphLayer({ className, focus, tasks, dependencies, markerId, lat
       <rect x={FOCUS_X} y={FOCUS_Y} width="5" height={FOCUS_HEIGHT} rx="2.5" fill={palette.accent} />
       <text x={FOCUS_X + 16} y={FOCUS_Y + 22} fill="#1f2923" fontFamily="Segoe UI, Microsoft YaHei, sans-serif" fontSize="14" fontWeight="600">{truncateSvgText(focus.title, FOCUS_TEXT_WIDTH, 14)}</text>
       {focus.description && <text x={FOCUS_X + 16} y={FOCUS_Y + 41} fill="#69756e" fontFamily="Segoe UI, Microsoft YaHei, sans-serif" fontSize="10.5">{truncateSvgText(focus.description, FOCUS_TEXT_WIDTH, 10.5)}</text>}
-      <foreignObject className="active-comment-object" x={FOCUS_X + FOCUS_WIDTH - 28} y={FOCUS_Y + 3} width="24" height="24">
-        <button
-          className={latestComments.length ? 'active-comment-marker has-comments' : 'active-comment-marker'}
-          type="button"
-          aria-label={latestComments.length ? `查看${focus.title}的最近评论` : `查看${focus.title}的评论`}
-          onMouseEnter={(event) => onCommentMarkerEnter?.(event.currentTarget, focus.id)}
-          onMouseLeave={onCommentMarkerLeave}
-          onFocus={(event) => onCommentMarkerEnter?.(event.currentTarget, focus.id)}
-          onBlur={onCommentMarkerLeave}
-          onClick={(event) => { event.preventDefault(); event.stopPropagation(); onCommentMarkerClick?.(event.currentTarget, focus.id); }}
-        >{latestComments.length > 0 ? <MessageCircleMore aria-hidden="true" /> : <MessageCircle aria-hidden="true" />}</button>
-      </foreignObject>
+      <g
+        className={latestComments.length ? 'active-comment-marker has-comments' : 'active-comment-marker'}
+        role="button"
+        tabIndex={0}
+        aria-label={latestComments.length ? `查看${focus.title}的最近评论` : `查看${focus.title}的评论`}
+        transform={`translate(${FOCUS_X + FOCUS_WIDTH - 28} ${FOCUS_Y + 3})`}
+        onMouseEnter={(event) => onCommentMarkerEnter?.(event.currentTarget, focus.id)}
+        onMouseLeave={onCommentMarkerLeave}
+        onFocus={(event) => onCommentMarkerEnter?.(event.currentTarget, focus.id)}
+        onBlur={onCommentMarkerLeave}
+        onClick={(event) => { event.preventDefault(); event.stopPropagation(); onCommentMarkerClick?.(event.currentTarget, focus.id); }}
+        onKeyDown={(event) => {
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+          event.preventDefault();
+          event.stopPropagation();
+          onCommentMarkerClick?.(event.currentTarget, focus.id);
+        }}
+      >
+        <rect className="active-comment-hit" x="-2" y="-2" width="28" height="28" rx="6" />
+        <rect className="active-comment-focus-ring" x="1" y="1" width="22" height="22" rx="5" />
+        <g className="active-comment-icon" transform="translate(4 4) scale(.6666667)" aria-hidden="true">
+          <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" />
+          {latestComments.length > 0 && <g className="active-comment-icon-dots">
+            <circle cx="8" cy="11" r=".8" />
+            <circle cx="12" cy="11" r=".8" />
+            <circle cx="16" cy="11" r=".8" />
+          </g>}
+        </g>
+      </g>
       <FocusStatusGlyph status={focus.status} x={FOCUS_X + 16} y={FOCUS_Y + FOCUS_HEIGHT - 15} />
       <text x={FOCUS_X + 31} y={FOCUS_Y + FOCUS_HEIGHT - 11} fill={palette.text} fontFamily="Segoe UI, Microsoft YaHei, sans-serif" fontSize="11">{taskStatusText[focus.status]}</text>
       <text x={FOCUS_X + FOCUS_WIDTH - 12} y={FOCUS_Y + FOCUS_HEIGHT - 11} textAnchor="end" fill="#69756e" fontFamily="Segoe UI, Microsoft YaHei, sans-serif" fontSize="9.5">{formatStatusDate(focus.statusChangedAt)}</text>
@@ -311,7 +328,7 @@ export function ActiveFocusGraph({ tasks, dependencies, focusTaskId, latestComme
     clearPopupClose();
     popupCloseTimer.current = setTimeout(() => setCommentPopup((current) => current?.pinned ? current : null), 150);
   };
-  const openCommentPopup = (marker: HTMLButtonElement, taskId: string, pinned = false) => {
+  const openCommentPopup = (marker: SVGGElement, taskId: string, pinned = false) => {
     const container = graphRef.current;
     if (!container) return;
     clearPopupClose();
@@ -323,7 +340,7 @@ export function ActiveFocusGraph({ tasks, dependencies, focusTaskId, latestComme
     );
     setCommentPopup({ taskId, comments: commentsByTask.get(taskId) ?? [], ...position, pinned });
   };
-  const toggleCommentPopup = (marker: HTMLButtonElement, taskId: string) => {
+  const toggleCommentPopup = (marker: SVGGElement, taskId: string) => {
     if (commentPopup?.taskId === taskId && commentPopup.pinned) {
       setCommentPopup(null);
       return;

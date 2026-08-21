@@ -2,7 +2,7 @@ import type { Dependency, Task } from '@sagnex/contracts';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { ActiveFocusGraph } from './ActiveFocusGraph';
+import { ActiveFocusGraph, calculateCommentPopupPosition } from './ActiveFocusGraph';
 
 const focus: Task = {
   id: '00000000-0000-4000-8000-000000000001', eventId: '00000000-0000-4000-8000-000000000002',
@@ -17,6 +17,20 @@ const dependencies: Dependency[] = [
 ];
 
 describe('ActiveFocusGraph', () => {
+  it('places comment panels beside the focus only when enough right-side space exists', () => {
+    const roomy = calculateCommentPopupPosition(
+      { left: 0, right: 600, top: 0, bottom: 238, width: 600, height: 238 },
+      { left: 200, right: 356, top: 80, bottom: 158, width: 156, height: 78 }
+    );
+    expect(roomy).toEqual({ left: 364, top: 52, width: 220, placement: 'right' });
+
+    const narrow = calculateCommentPopupPosition(
+      { left: 0, right: 420, top: 0, bottom: 238, width: 420, height: 238 },
+      { left: 132, right: 288, top: 80, bottom: 158, width: 156, height: 78 }
+    );
+    expect(narrow).toEqual({ left: 30, top: 52, width: 360, placement: 'sheet' });
+  });
+
   it('renders one detailed focus and all direct neighbors', () => {
     const { container } = render(<ActiveFocusGraph tasks={[focus, predecessor, successor]} dependencies={dependencies} focusTaskId={focus.id} />);
     expect(container.querySelectorAll('.active-focus-node')).toHaveLength(1);
@@ -47,18 +61,20 @@ describe('ActiveFocusGraph', () => {
       onTaskClick={onTaskClick}
     />);
     const marker = within(container).getByRole('button', { name: `查看${focus.title}的最近评论` });
+    expect(marker).not.toHaveAttribute('title');
+    expect(marker.querySelector('.active-comment-dot')).toBeInTheDocument();
     await userEvent.hover(marker);
-    expect(within(container).getByRole('dialog', { name: '最近评论' })).toHaveTextContent('第二条评论 👍');
+    expect(screen.getByRole('dialog', { name: '最近评论' })).toHaveTextContent('第二条评论 👍');
     await userEvent.click(marker);
     expect(onTaskClick).not.toHaveBeenCalled();
-    expect(within(container).getByRole('dialog', { name: '最近评论' })).toHaveTextContent('第一条评论');
+    expect(screen.getByRole('dialog', { name: '最近评论' })).toHaveTextContent('第一条评论');
   });
 
   it('offers a detail link when the focus task has no comments', async () => {
     const onTaskClick = vi.fn();
     const { container } = render(<ActiveFocusGraph tasks={[focus]} dependencies={[]} focusTaskId={focus.id} onTaskClick={onTaskClick} />);
     await userEvent.click(within(container).getByRole('button', { name: `查看${focus.title}的评论` }));
-    await userEvent.click(within(container).getByRole('button', { name: '进入详情添加评论' }));
+    await userEvent.click(screen.getByRole('button', { name: '进入详情添加评论' }));
     expect(onTaskClick).toHaveBeenCalledWith(focus.id);
   });
 

@@ -1,6 +1,7 @@
 import type { Dependency, PreviewLatestComment, Task, TaskStatus } from '@sagnex/contracts';
-import { ChevronLeft, ChevronRight, MessageCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MessageCircle, X } from 'lucide-react';
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
+import { createPortal } from 'react-dom';
 import { formatStatusDate, taskStatusText } from '../api';
 import { truncateSvgText } from './GraphSvg';
 import { getEditorEdgePath, GRAPH_EDGE_COLOR, GRAPH_EDGE_WIDTH } from './taskNodeGeometry';
@@ -17,6 +18,11 @@ const SIDE_TOP = 18;
 const SIDE_BOTTOM = 38;
 const SIDE_GAP = 20;
 const MAX_SIDE_ROWS = 7;
+const COMMENT_POPUP_WIDTH = 220;
+const COMMENT_POPUP_MIN_WIDTH = 180;
+const COMMENT_POPUP_HEIGHT = 176;
+const COMMENT_POPUP_GAP = 8;
+const COMMENT_POPUP_INSET = 10;
 
 const statusColors: Record<TaskStatus, { accent: string; border: string; fill: string; text: string; compact: string }> = {
   not_started: { accent: '#6f7973', border: '#cbd3ce', fill: '#ffffff', text: '#4f5953', compact: '#e5ebe7' },
@@ -44,6 +50,44 @@ interface ActiveFocusGraphProps {
 }
 
 type TransitionDirection = 'next' | 'previous';
+
+interface RectLike {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+  width: number;
+  height: number;
+}
+
+export interface CommentPopupPosition {
+  left: number;
+  top: number;
+  width: number;
+  placement: 'right' | 'sheet';
+}
+
+export function calculateCommentPopupPosition(viewport: RectLike, focusNode: RectLike): CommentPopupPosition {
+  const rightSpace = viewport.right - focusNode.right - COMMENT_POPUP_GAP - COMMENT_POPUP_INSET;
+  if (rightSpace >= COMMENT_POPUP_MIN_WIDTH) {
+    return {
+      left: focusNode.right + COMMENT_POPUP_GAP,
+      top: Math.min(
+        Math.max(COMMENT_POPUP_INSET, focusNode.top),
+        Math.max(COMMENT_POPUP_INSET, viewport.height - COMMENT_POPUP_HEIGHT - COMMENT_POPUP_INSET)
+      ),
+      width: Math.min(COMMENT_POPUP_WIDTH, rightSpace),
+      placement: 'right'
+    };
+  }
+  const width = Math.min(360, Math.max(0, viewport.width - COMMENT_POPUP_INSET * 2));
+  return {
+    left: Math.max(COMMENT_POPUP_INSET, (viewport.width - width) / 2),
+    top: Math.max(COMMENT_POPUP_INSET, viewport.height - COMMENT_POPUP_HEIGHT - COMMENT_POPUP_INSET),
+    width,
+    placement: 'sheet'
+  };
+}
 
 function layoutSide(tasks: Task[], minX: number, maxX: number, nearestFirst: boolean): CompactNode[] {
   if (tasks.length === 0) return [];
@@ -164,13 +208,12 @@ function ActiveGraphLayer({ className, focus, tasks, dependencies, markerId, lat
           className={latestComments.length ? 'active-comment-marker has-comments' : 'active-comment-marker'}
           type="button"
           aria-label={latestComments.length ? `查看${focus.title}的最近评论` : `查看${focus.title}的评论`}
-          title={latestComments.length ? '查看最近评论' : '暂无评论，点击进入详情添加'}
           onMouseEnter={(event) => onCommentMarkerEnter?.(event.currentTarget, focus.id)}
           onMouseLeave={onCommentMarkerLeave}
           onFocus={(event) => onCommentMarkerEnter?.(event.currentTarget, focus.id)}
           onBlur={onCommentMarkerLeave}
           onClick={(event) => { event.preventDefault(); event.stopPropagation(); onCommentMarkerClick?.(event.currentTarget, focus.id); }}
-        ><MessageCircle aria-hidden="true" /></button>
+        ><MessageCircle aria-hidden="true" />{latestComments.length > 0 && <span className="active-comment-dot" aria-hidden="true" />}</button>
       </foreignObject>
       <FocusStatusGlyph status={focus.status} x={FOCUS_X + 16} y={FOCUS_Y + FOCUS_HEIGHT - 15} />
       <text x={FOCUS_X + 31} y={FOCUS_Y + FOCUS_HEIGHT - 11} fill={palette.text} fontFamily="Segoe UI, Microsoft YaHei, sans-serif" fontSize="11">{taskStatusText[focus.status]}</text>
@@ -194,8 +237,9 @@ export function ActiveFocusGraph({ tasks, dependencies, focusTaskId, latestComme
   const [transitionDirection, setTransitionDirection] = useState<TransitionDirection>('next');
   const transitionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const graphRef = useRef<HTMLDivElement>(null);
+  const popupRef = useRef<HTMLElement>(null);
   const popupCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [commentPopup, setCommentPopup] = useState<{ taskId: string; comments: PreviewLatestComment[]; left: number; top: number; width: number; pinned: boolean } | null>(null);
+  const [commentPopup, setCommentPopup] = useState<{ taskId: string; comments: PreviewLatestComment[]; left: number; top: number; width: number; placement: 'right' | 'sheet'; pinned: boolean } | null>(null);
   const commentsByTask = useMemo(() => {
     const map = new Map<string, PreviewLatestComment[]>();
     for (const comment of latestComments) map.set(comment.taskId, [...(map.get(comment.taskId) ?? []), comment]);
@@ -205,6 +249,22 @@ export function ActiveFocusGraph({ tasks, dependencies, focusTaskId, latestComme
     if (transitionTimer.current) clearTimeout(transitionTimer.current);
     if (popupCloseTimer.current) clearTimeout(popupCloseTimer.current);
   }, []);
+  useEffect(() => {
+    if (!commentPopup?.pinned) return;
+    const close = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (!popupRef.current?.contains(target) && !(target instanceof Element && target.closest('.active-comment-marker'))) setCommentPopup(null);
+    };
+    const closeOnEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key === 'Escape') setCommentPopup(null);
+    };
+    document.addEventListener('pointerdown', close);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', close);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [commentPopup?.pinned]);
   const selectedFocusId = activeTasks.some((task) => task.id === currentFocusId)
     ? currentFocusId
     : activeTasks.some((task) => task.id === focusTaskId) ? focusTaskId : activeTasks[0]?.id ?? focusTaskId;
@@ -255,16 +315,13 @@ export function ActiveFocusGraph({ tasks, dependencies, focusTaskId, latestComme
     const container = graphRef.current;
     if (!container) return;
     clearPopupClose();
-    const markerRect = marker.getBoundingClientRect();
-    const containerRect = container.getBoundingClientRect();
-    const width = Math.min(260, Math.max(190, containerRect.width - 24));
-    const height = 190;
-    let left = markerRect.right - containerRect.left + 8;
-    let top = markerRect.top - containerRect.top;
-    if (left + width > containerRect.width - 8) left = markerRect.left - containerRect.left - width - 8;
-    left = Math.max(8, left);
-    if (top + height > containerRect.height - 8) top = Math.max(8, containerRect.height - height - 8);
-    setCommentPopup({ taskId, comments: commentsByTask.get(taskId) ?? [], left, top, width, pinned });
+    const focusNode = marker.closest('.active-focus-node');
+    const focusRect = focusNode?.getBoundingClientRect() ?? marker.getBoundingClientRect();
+    const position = calculateCommentPopupPosition(
+      { left: 0, right: window.innerWidth, top: 0, bottom: window.innerHeight, width: window.innerWidth, height: window.innerHeight },
+      focusRect
+    );
+    setCommentPopup({ taskId, comments: commentsByTask.get(taskId) ?? [], ...position, pinned });
   };
   const toggleCommentPopup = (marker: HTMLButtonElement, taskId: string) => {
     if (commentPopup?.taskId === taskId && commentPopup.pinned) {
@@ -289,8 +346,9 @@ export function ActiveFocusGraph({ tasks, dependencies, focusTaskId, latestComme
       <ActiveGraphLayer key={focus.id} className={isTransitioning ? `active-focus-layer-current active-focus-enter-${transitionDirection}` : 'active-focus-layer-current'} focus={focus} tasks={tasks} dependencies={dependencies} markerId={markerId} latestComments={commentsByTask.get(focus.id) ?? []} onTaskClick={onTaskClick} onCommentMarkerEnter={(marker, taskId) => openCommentPopup(marker, taskId)} onCommentMarkerLeave={schedulePopupClose} onCommentMarkerClick={toggleCommentPopup} />
       {outgoingFocus && <ActiveGraphLayer className={`active-focus-layer-outgoing active-focus-exit-${transitionDirection}`} focus={outgoingFocus} tasks={tasks} dependencies={dependencies} markerId={markerId} latestComments={commentsByTask.get(outgoingFocus.id) ?? []} onTaskClick={onTaskClick} onCommentMarkerEnter={(marker, taskId) => openCommentPopup(marker, taskId)} onCommentMarkerLeave={schedulePopupClose} onCommentMarkerClick={toggleCommentPopup} onAnimationEnd={finishTransition} />}
     </svg>
-    {commentPopup && <aside
-      className="active-comment-popup"
+    {commentPopup && createPortal(<aside
+      ref={popupRef}
+      className={`active-comment-popup placement-${commentPopup.placement}`}
       role="dialog"
       aria-label="最近评论"
       style={{ left: commentPopup.left, top: commentPopup.top, width: commentPopup.width }}
@@ -298,9 +356,9 @@ export function ActiveFocusGraph({ tasks, dependencies, focusTaskId, latestComme
       onMouseLeave={() => { if (!commentPopup.pinned) schedulePopupClose(); }}
       onClick={(event) => event.stopPropagation()}
     >
-      <header><strong>最近评论</strong><button type="button" aria-label="关闭评论" onClick={() => setCommentPopup(null)}>×</button></header>
+      <header><strong>最近评论</strong><button type="button" aria-label="关闭评论" onClick={() => setCommentPopup(null)}><X /></button></header>
       {commentPopup.comments.length ? <div className="active-comment-list">{commentPopup.comments.map((comment) => <article key={comment.taskId + comment.createdAt}><time>{new Intl.DateTimeFormat('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(comment.createdAt))}</time><p>{comment.content}</p></article>)}</div> : <div className="active-comment-empty"><p>暂无评论</p><button type="button" onClick={() => { const taskId = commentPopup.taskId; setCommentPopup(null); (onAddComment ?? onTaskClick)?.(taskId); }}>进入详情添加评论</button></div>}
-    </aside>}
+    </aside>, document.body)}
     {showCarousel && <div className="active-focus-carousel" aria-label={`活跃任务 ${currentIndex + 1} / ${activeTasks.length}`} aria-busy={isTransitioning}>
       <button className="active-carousel-arrow previous" type="button" aria-label="上一个活跃任务" title="上一个活跃任务" disabled={isTransitioning} onClick={(event) => changeFocus(event, -1)}><ChevronLeft /></button>
       <button className="active-carousel-arrow next" type="button" aria-label="下一个活跃任务" title="下一个活跃任务" disabled={isTransitioning} onClick={(event) => changeFocus(event, 1)}><ChevronRight /></button>

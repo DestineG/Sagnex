@@ -203,22 +203,28 @@ svg { width: 17px; height: 17px; flex: 0 0 auto; }
 .active-focus-node:hover > rect:first-of-type, .active-focus-node:focus-visible > rect:first-of-type { stroke: #137a55; stroke-width: 3; }
 .active-compact-node:hover rect, .active-compact-node:focus-visible rect { filter: brightness(.92); stroke-width: 2; }
 .active-focus-node:focus-visible, .active-compact-node:focus-visible { outline: none; }
-.active-comment-marker { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 1px solid #cbd8d0; border-radius: 6px; color: #8a9890; background: rgb(255 255 255 / 84%); cursor: pointer; }
-.active-comment-marker svg { width: 15px; height: 15px; }
-.active-comment-marker:hover, .active-comment-marker:focus-visible { border-color: #6da88d; color: var(--green-strong); background: #ffffff; outline: 2px solid rgb(19 122 85 / 18%); outline-offset: 1px; }
-.active-comment-marker.has-comments { color: var(--green-strong); border-color: #91c3aa; background: #f5fcf8; }
-.active-comment-popup { position: absolute; z-index: 8; display: grid; grid-template-rows: 35px minmax(0, 1fr); height: 190px; overflow: hidden; border: 1px solid var(--line-strong); border-radius: 7px; background: var(--surface); box-shadow: var(--shadow-popover); pointer-events: auto; }
-.active-comment-popup > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 9px 0 12px; border-bottom: 1px solid var(--line); color: var(--muted-strong); font-size: 12px; }
-.active-comment-popup > header button { display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 4px; color: var(--muted); background: transparent; font-size: 18px; line-height: 1; cursor: pointer; }
+.active-comment-marker { position: relative; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 5px; color: #87938c; background: transparent; opacity: .62; cursor: pointer; transition: color 120ms ease, opacity 120ms ease, background 120ms ease; }
+.active-comment-marker svg { width: 16px; height: 16px; }
+.active-comment-marker:hover, .active-comment-marker:focus-visible { color: #59675f; background: rgb(255 255 255 / 48%); opacity: 1; outline: none; }
+.active-comment-marker:focus-visible { box-shadow: 0 0 0 2px rgb(19 122 85 / 22%); }
+.active-comment-marker.has-comments { color: var(--green-strong); opacity: 1; }
+.active-comment-marker.has-comments:hover, .active-comment-marker.has-comments:focus-visible { color: #075c3d; background: rgb(255 255 255 / 42%); }
+.active-comment-dot { position: absolute; top: 4px; right: 3px; width: 5px; height: 5px; border: 1px solid #f4faf6; border-radius: 50%; background: #e06f2d; box-shadow: 0 0 0 1px rgb(181 80 25 / 12%); }
+.active-comment-popup { position: fixed; z-index: 120; display: grid; grid-template-rows: 32px minmax(0, 1fr); height: 176px; overflow: hidden; border: 1px solid #ced8d2; border-radius: 7px; background: rgb(255 255 255 / 97%); box-shadow: 0 9px 24px rgb(28 47 36 / 12%), 0 2px 6px rgb(28 47 36 / 6%); pointer-events: auto; }
+.active-comment-popup.placement-sheet { box-shadow: 0 12px 32px rgb(28 47 36 / 16%), 0 2px 7px rgb(28 47 36 / 7%); }
+.active-comment-popup > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 6px 0 11px; border-bottom: 1px solid #e5ebe7; color: var(--muted-strong); font-size: 12px; }
+.active-comment-popup > header strong { font-weight: 650; }
+.active-comment-popup > header button { display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 4px; color: #7a8780; background: transparent; cursor: pointer; }
+.active-comment-popup > header button svg { width: 14px; height: 14px; }
 .active-comment-popup > header button:hover, .active-comment-popup > header button:focus-visible { color: var(--text); background: var(--subtle); outline: none; }
-.active-comment-list { min-height: 0; overflow-y: auto; padding: 8px 11px 9px 12px; }
-.active-comment-list article { padding: 7px 0 8px; border-bottom: 1px solid var(--line); }
+.active-comment-list { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 5px 10px 8px 11px; scrollbar-width: thin; scrollbar-color: #bdc9c1 transparent; }
+.active-comment-list article { padding: 7px 0 8px; border-bottom: 1px solid #e8edea; }
 .active-comment-list article:last-child { border-bottom: 0; }
 .active-comment-list time { display: block; color: var(--muted); font-size: 10px; }
-.active-comment-list p { margin-top: 3px; overflow-wrap: anywhere; white-space: pre-wrap; line-height: 1.45; }
-.active-comment-empty { display: grid; place-items: center; align-content: center; gap: 6px; padding: 14px; color: var(--muted); text-align: center; }
-.active-comment-empty button { padding: 3px 6px; border: 0; border-radius: 4px; color: var(--green-strong); background: var(--green-soft); cursor: pointer; font-size: 12px; }
-.active-comment-empty button:hover, .active-comment-empty button:focus-visible { background: #d8efe2; outline: none; }
+.active-comment-list p { margin-top: 3px; overflow-wrap: anywhere; color: #344139; white-space: pre-wrap; line-height: 1.45; }
+.active-comment-empty { display: grid; place-items: center; align-content: center; gap: 5px; padding: 12px; color: var(--muted); text-align: center; }
+.active-comment-empty button { padding: 2px 4px; border: 0; border-radius: 3px; color: var(--green-strong); background: transparent; cursor: pointer; font-size: 12px; }
+.active-comment-empty button:hover, .active-comment-empty button:focus-visible { color: #075c3d; background: var(--green-soft); outline: none; }
 .active-export.exporting .active-comment-marker, .active-export.exporting .active-comment-popup { display: none; }
 .graph-node-action { cursor: pointer; pointer-events: all; }
 .graph-node-action:hover > g > rect:first-child, .graph-node-action:focus-visible > g > rect:first-child { stroke: #137a55; stroke-width: 3; }

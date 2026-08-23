@@ -87,6 +87,8 @@ data/caddy/pki/authorities/local/root.crt
 
 需要将该根证书安装到访问设备的受信任根证书存储中，否则浏览器会显示证书警告。不要在公网环境中习惯性忽略证书警告，因为这无法确认连接到的是否是自己的服务器。
 
+免费域名证书、公网 IP 证书及后续升级建议见 [`docs/https-certificates.md`](docs/https-certificates.md)。公网 IP 可信证书目前仅完成调研，尚未在部署配置中启用。
+
 ## 局域网访问
 
 可信局域网中的设备可以绕过云服务器和 FRP，直接访问运行 Sagnex 的机器：
